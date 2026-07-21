@@ -1,57 +1,67 @@
 # AI Secure Coding Baseline
 
-Secure-coding rules for AI coding assistants — the baseline Claude Code, Copilot, and Codex follow when they write and change code.
+A short set of secure-coding rules for AI coding assistants. Drop it into a project and Claude Code, Copilot, or Codex will follow it when they write or change code.
 
-## Why
+## Why this exists
 
-AI coding assistants make predictable security mistakes. They add auth bypasses to make tests pass, invent package names, echo secrets into logs, skip input validation, and leak stack traces to clients. They also over-reach — rewriting working code you never asked them to touch.
+AI assistants are useful, but they cut security corners in fairly predictable ways. They'll disable a check to get a test green, import a package that doesn't exist, log a secret, trust input that came straight from a user, or hand back a raw stack trace. They also tend to overreach: ask for a small change and they'll quietly rewrite working code around it.
 
-This baseline is a short set of rules that steers them away from both. It is written for real, existing codebases: it applies only to the code the assistant writes or changes, it flags pre-existing issues instead of silently rewriting them, and it reuses whatever security mechanisms the project already has.
+This baseline pushes back on that. It's written for codebases that already exist, so it stays narrow. It only covers the code the assistant actually writes or changes. It points out pre-existing problems instead of fixing them behind your back. And it reuses whatever security mechanisms the project already has rather than inventing new ones.
 
 ## The rules
 
-The full baseline is in **[ai-secure-coding-baseline.md](ai-secure-coding-baseline.md)** — eleven rules, risk-ordered, the first four non-negotiable:
+The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Eleven rules, ordered by risk, with the first four marked non-negotiable:
 
-Access Control · Untrusted Input · Secrets · Preserve Security · Secure by Default · Privilege Separation · Proven Mechanisms · Dependencies · Errors & Logging · Resource Limits · Production vs. Test
+Access control, untrusted input, secrets, preserving existing controls, secure defaults, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, and keeping test bypasses out of production.
 
-Two rules at the top set the boundaries for existing projects: **Scope** (only touch what your change touches) and **Flag, don't fix** (report pre-existing issues, don't silently rewrite them).
+Two rules at the top are what make it safe to use on an existing project. *Scope* keeps the assistant to the code your change touches. *Flag, don't fix* tells it to report a pre-existing issue in a line or two and move on, instead of going off and rewriting things.
 
-## Integration
+## Using it
 
-Same content, three tools. Each reads instructions from a fixed path in the repo — copy the baseline into that path.
+Every tool loads its instructions from fixed locations. You can apply the baseline at three levels: a single project, your own machine (so it covers all your projects), or a whole organization. The content is the same in each case.
 
 ### Claude Code
 
-Claude Code can reference the file directly. Copy `ai-secure-coding-baseline.md` into the repo and import it from `CLAUDE.md`:
+Claude Code can pull the file in with an `@` import, so you don't have to copy it around.
 
-```markdown
-# CLAUDE.md
-@ai-secure-coding-baseline.md
-```
-
-For all your projects, put the same import in `~/.claude/CLAUDE.md`. For a whole organization, deploy it as managed policy via MDM.
+- **Project** — put `ai-secure-coding-baseline.md` in the repo and import it from the project `CLAUDE.md`:
+  ```markdown
+  # CLAUDE.md
+  @ai-secure-coding-baseline.md
+  ```
+- **Your machine** — do the same import from `~/.claude/CLAUDE.md`, pointing at an absolute path:
+  ```markdown
+  @/absolute/path/to/ai-secure-coding-baseline.md
+  ```
+- **Organization** — to enforce it centrally, ship a `managed-settings.json` through your MDM (on Linux that's `/etc/claude-code/managed-settings.json`; see the [official docs](https://docs.claude.com/en/docs/claude-code) for the macOS and Windows paths). You can also package the baseline as a plugin and hand it out through an internal marketplace, which people add once with `/plugin marketplace add <your-repo>`.
 
 ### GitHub Copilot
 
-Copilot reads `.github/copilot-instructions.md` automatically. It cannot import another file, so paste the rules in:
+Copilot picks up its instructions on its own, but it can't import another file, so the rules have to live in its file directly.
 
-```bash
-mkdir -p .github
-cp ai-secure-coding-baseline.md .github/copilot-instructions.md
-```
-
-For every repo in an organization, set the same content as **Organization custom instructions** in your GitHub Copilot settings.
+- **Project** — copy them into `.github/copilot-instructions.md`:
+  ```bash
+  mkdir -p .github
+  cp ai-secure-coding-baseline.md .github/copilot-instructions.md
+  ```
+- **Your account** — paste them into your personal custom instructions in the Copilot settings.
+- **Organization** — set the same text as organization (or enterprise) custom instructions in the Copilot admin settings. That covers every member across all repositories without a per-repo file, and it's the cleanest central option of the three tools.
 
 ### OpenAI Codex
 
-Codex reads `AGENTS.md` from the repo root automatically. It cannot import another file, so paste the rules in:
+Codex reads `AGENTS.md` automatically, and like Copilot it can't import another file.
 
-```bash
-cp ai-secure-coding-baseline.md AGENTS.md
-```
+- **Project** — copy the rules into `AGENTS.md` at the repo root:
+  ```bash
+  cp ai-secure-coding-baseline.md AGENTS.md
+  ```
+- **Your machine** — put them in `~/.codex/AGENTS.md`.
+- **Organization** — there's no admin-pushed rules channel yet, so the practical route is a template repository that new projects inherit `AGENTS.md` from.
 
-For all your projects, put the same content in `~/.codex/AGENTS.md`.
+### Keeping the copies in sync
 
-## This is guidance, not enforcement
+Only Claude Code can point at a shared file; for the others the text is duplicated. If you end up with several copies, treat `ai-secure-coding-baseline.md` as the source and generate the rest from it in CI or a pre-commit hook, writing the source commit into each generated file so you can tell when one has gone stale. New repos are easiest to handle with an organization template.
 
-An instructions file biases what an assistant generates — it does not guarantee it. Pair the baseline with a security review on the diff (a CI check, or a review pass before merge) so something actually blocks when a rule is missed. The file prevents at write time; the review catches what slips through.
+## Don't rely on it alone
+
+An instructions file changes what an assistant tends to write, but it can't guarantee anything — the model still makes the call. So use it as the first layer, not the only one. Put a security review on the actual diff, either in CI or as a step before merge, so there's something that can genuinely stop a bad change. The baseline helps while the code is being written; the review is what catches whatever slips past it.
