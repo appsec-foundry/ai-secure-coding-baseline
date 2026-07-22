@@ -2,7 +2,7 @@
 
 A short set of secure-coding rules for AI coding assistants. Drop it into a project and Claude Code, Copilot, or Codex will follow it when they write or change code.
 
-> **Security notice**
+> **Limitations**
 >
 > This baseline guides an LLM; it is not an enforceable security control or a guarantee of secure code. Supplement it with project-specific security instructions. Validate changes independently through code review, automated tests, dependency and secret scanning, SAST, and CI or pre-commit checks where appropriate.
 
