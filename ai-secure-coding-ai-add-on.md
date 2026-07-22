@@ -1,6 +1,6 @@
 # AI Application Security Add-on
 
-**Scope:** Apply these rules only when a change builds or changes an LLM-powered feature. They supplement, not replace, the AI Secure Coding Baseline.
+**Scope:** Apply these rules only when a change builds or changes an LLM-powered feature. They supplement, not replace, the AI Secure Coding Baseline, including its distinction between an existing application and greenfield work. For greenfield AI features, establish the applicable controls before the first production release; for existing applications, apply them to the changed feature and its directly affected interfaces.
 
 - **Untrusted AI Inputs and Outputs:** Treat prompts, model outputs, retrieved content, tool output, documents, URLs, and agent memory as untrusted data. Validate it before rendering, executing, or passing it to another system. Do not let its instructions or data override application policy, authorization, or task boundaries.
 - **Authorization and Tool Access:** Authorize every tool action server-side for the authenticated user and specific resource. Give each tool the minimum permissions and data it needs; do not expose broad credentials or unrestricted shell, network, or data access to a model.

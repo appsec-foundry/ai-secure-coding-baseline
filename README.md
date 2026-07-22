@@ -16,7 +16,7 @@ It improves the odds of a secure change; it does not guarantee one. Keep normal 
 
 ## The rules
 
-The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Fourteen rules, ordered by risk, with the first four marked non-negotiable:
+The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Thirteen rules, ordered by risk, with the first four marked non-negotiable:
 
 Access control, untrusted input, secrets and default credentials, preserving existing controls, secure defaults and platform protections, authentication abuse resistance, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, separating development from production, and security tests with representative negative or abuse cases.
 
@@ -26,7 +26,7 @@ Before completion, it also requires a review of the changed diff against the bas
 
 For a project that builds LLM-powered features, also load [ai-secure-coding-ai-add-on.md](ai-secure-coding-ai-add-on.md). It covers AI-specific risks such as prompt injection, tool authorization, action limits, memory isolation, and the OWASP LLM and Agentic Top 10 reviews. Do not load it for ordinary projects that only use an AI assistant to write code.
 
-Two rules at the top are what make it safe to use on an existing project. *Scope* keeps the assistant to the code your change touches. *Report, don't expand* tells it to report concrete pre-existing issues without silently rewriting surrounding code or turning the task into a repository-wide audit.
+The baseline first distinguishes two operating modes. For an *existing application*, it keeps the assistant to the code a change touches and has it report concrete pre-existing issues without silently rewriting surrounding code or turning the task into a repository-wide audit. For *greenfield work*, the assistant establishes applicable controls across the new application or component and verifies them before its first production release.
 
 ## Using it
 
