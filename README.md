@@ -16,9 +16,9 @@ It improves the odds of a secure change; it does not guarantee one. Keep normal 
 
 ## The rules
 
-The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Thirteen rules, ordered by risk, with the first four marked non-negotiable:
+The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Fourteen rules, ordered by risk, with the first four marked non-negotiable:
 
-Access control, untrusted input, secrets and default credentials, preserving existing controls, secure defaults and platform protections, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, separating development from production, and security tests with representative negative or abuse cases.
+Access control, untrusted input, secrets and default credentials, preserving existing controls, secure defaults and platform protections, authentication abuse resistance, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, separating development from production, and security tests with representative negative or abuse cases.
 
 Before completion, it also requires a review of the changed diff against the baseline. The assistant must actively report every concrete security issue found, including fixed issues; for security-relevant changes it also reports affected controls, test results, and unresolved risks or verification gaps.
 
