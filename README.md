@@ -10,9 +10,15 @@ This baseline pushes back on that. It's written for codebases that already exist
 
 ## The rules
 
-The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Eleven rules, ordered by risk, with the first four marked non-negotiable:
+The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Twelve rules, ordered by risk, with the first four marked non-negotiable:
 
 Access control, untrusted input, secrets, preserving existing controls, secure defaults, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, and keeping test bypasses out of production.
+
+Before committing, it also requires a review of the changed diff against the baseline, with concrete findings reported or resolved in the changed code.
+
+## Optional AI application add-on
+
+For a project that builds LLM-powered features, also load [ai-secure-coding-ai-add-on.md](ai-secure-coding-ai-add-on.md). It covers AI-specific risks such as prompt injection, tool authorization, action limits, memory isolation, and the OWASP LLM and Agentic Top 10 reviews. Do not load it for ordinary projects that only use an AI assistant to write code.
 
 Two rules at the top are what make it safe to use on an existing project. *Scope* keeps the assistant to the code your change touches. *Flag, don't fix* tells it to report a pre-existing issue in a line or two and move on, instead of going off and rewriting things.
 

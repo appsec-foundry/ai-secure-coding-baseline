@@ -20,3 +20,7 @@
 - **Errors & Logging:** Fail without leaking internals: no stack traces, internal paths, or raw exceptions to clients; log security-relevant events (authn/authz decisions, input rejections) with enough context to investigate, without sensitive data.
 - **Resource Limits:** Bound input-driven work: timeouts, size/pagination caps, no unbounded loops or user-supplied regex. Assume any external call can hang or fail.
 - **Production vs. Test:** Treat code as production when its context is uncertain; keep test-only mocks and security bypasses out of production execution paths.
+
+## Before Commit
+
+- **Review the Diff:** Before committing, review the changed diff against this baseline; report or resolve concrete findings in the changed code.
