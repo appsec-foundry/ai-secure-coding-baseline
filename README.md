@@ -8,6 +8,12 @@ AI assistants are useful, but they cut security corners in fairly predictable wa
 
 This baseline pushes back on that. It's written for codebases that already exist, so it stays narrow. It only covers the code the assistant actually writes or changes. It points out pre-existing problems instead of fixing them behind your back. And it reuses whatever security mechanisms the project already has rather than inventing new ones.
 
+## What it helps with
+
+Modern coding assistants often make sensible security choices on their own. Still, without clear project guidance, they are less likely to apply those choices consistently—especially when a task is urgent, ambiguous, or asks them to change existing code. This baseline gives the assistant a shared, concrete set of expectations while it works.
+
+It improves the odds of a secure change; it does not guarantee one. Keep normal security controls in place, including review of the actual diff before merge.
+
 ## The rules
 
 The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Twelve rules, ordered by risk, with the first four marked non-negotiable:
@@ -80,4 +86,6 @@ Only Claude Code can point at a shared file. For Copilot and Codex the text is c
 
 ## Don't rely on it alone
 
-An instructions file changes what an assistant tends to write, but it can't guarantee anything: the model still makes the call. So use it as the first layer, not the only one. Put a security review on the actual diff, either in CI or as a step before merge, so there's something that can genuinely stop a bad change. The baseline helps while the code is being written; the review is what catches whatever slips past it.
+Use this baseline as one layer, not the only one. A review of the actual diff—either in CI or before merge—is the independent control that can catch and stop a bad change.
+
+For background, [Scheurer, Balesni, and Hobbhahn (2024)](https://arxiv.org/abs/2311.07590) show that instructions can reduce, but not eliminate, undesirable behavior in a pressured scenario. [Wallace et al. (2024)](https://arxiv.org/abs/2404.13208) describe how training models to respect an instruction hierarchy can improve their robustness.
