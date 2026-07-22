@@ -16,17 +16,17 @@ It improves the odds of a secure change; it does not guarantee one. Keep normal 
 
 ## The rules
 
-The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Twelve rules, ordered by risk, with the first four marked non-negotiable:
+The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Thirteen rules, ordered by risk, with the first four marked non-negotiable:
 
-Access control, untrusted input, secrets, preserving existing controls, secure defaults, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, and keeping test bypasses out of production.
+Access control, untrusted input, secrets and default credentials, preserving existing controls, secure defaults and platform protections, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, separating development from production, and security tests with representative negative or abuse cases.
 
-Before committing, it also requires a review of the changed diff against the baseline, with concrete findings reported or resolved in the changed code.
+Before completion, it also requires a review of the changed diff against the baseline. The assistant must actively report every concrete security issue found, including fixed issues; for security-relevant changes it also reports affected controls, test results, and unresolved risks or verification gaps.
 
 ## Optional AI application add-on
 
 For a project that builds LLM-powered features, also load [ai-secure-coding-ai-add-on.md](ai-secure-coding-ai-add-on.md). It covers AI-specific risks such as prompt injection, tool authorization, action limits, memory isolation, and the OWASP LLM and Agentic Top 10 reviews. Do not load it for ordinary projects that only use an AI assistant to write code.
 
-Two rules at the top are what make it safe to use on an existing project. *Scope* keeps the assistant to the code your change touches. *Flag, don't fix* tells it to report a pre-existing issue in a line or two and move on, instead of going off and rewriting things.
+Two rules at the top are what make it safe to use on an existing project. *Scope* keeps the assistant to the code your change touches. *Report, don't expand* tells it to report concrete pre-existing issues without silently rewriting surrounding code or turning the task into a repository-wide audit.
 
 ## Using it
 
