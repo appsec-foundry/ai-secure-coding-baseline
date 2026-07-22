@@ -26,6 +26,16 @@ Two rules at the top are what make it safe to use on an existing project. *Scope
 
 Every tool loads its instructions from fixed locations. You can apply the baseline at three levels: a single project, your own machine (so it covers all your projects), or a whole organization. The content is the same in each case.
 
+### Keep the baseline as a separate file
+
+If you want to keep `ai-secure-coding-baseline.md` as the single, separate file in a project, add this instruction to the project's normal AI-instructions file:
+
+```markdown
+Before making any code changes, read `ai-secure-coding-baseline.md` in this repository and follow all rules defined there.
+```
+
+This works for any coding assistant whose project instructions can tell it to read a repository file. Use the tool's usual instruction file (for example, `CLAUDE.md`, `.github/copilot-instructions.md`, or `AGENTS.md`). It is an instruction to read the file, not a native file import; Claude Code's `@` import below is the exception.
+
 ### Claude Code
 
 Claude Code can pull the file in with an `@` import, so you don't have to copy it around.
