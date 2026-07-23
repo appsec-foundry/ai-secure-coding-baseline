@@ -75,12 +75,25 @@ Claude Code can import the baseline directly.
 
 Copilot instruction support varies by surface. Copy the baseline into `.github/copilot-instructions.md` for broad repository coverage.
 
-- **Project:** copy them into `.github/copilot-instructions.md`:
+- **Project:** copy them into `.github/copilot-instructions.md`. If the file already exists, append instead of overwriting so existing instructions are preserved:
 
   ```bash
   mkdir -p .github
+  # New file:
   cp ai-secure-coding-baseline.md .github/copilot-instructions.md
+  # Existing file — append the baseline:
+  cat ai-secure-coding-baseline.md >> .github/copilot-instructions.md
   ```
+
+- **Keep it as a separate file (most surfaces):** place the baseline as its own path-specific instructions file so it loads automatically without touching an existing `copilot-instructions.md`:
+
+  ```bash
+  mkdir -p .github/instructions
+  { printf -- '---\napplyTo: "**"\n---\n'; cat ai-secure-coding-baseline.md; } \
+    > .github/instructions/secure-coding.instructions.md
+  ```
+
+  `applyTo: "**"` applies it repository-wide. Path-specific `.github/instructions/**/*.instructions.md` files are supported by the Copilot cloud agent and most Chat and code-review surfaces, but not all (for example, Eclipse Chat reads only `copilot-instructions.md`). For guaranteed coverage everywhere, use `copilot-instructions.md` above.
 
 - **Your account:** paste it into personal custom instructions for Copilot Chat on GitHub.
 - **Organization:** add it as organization custom instructions for supported GitHub.com features. See the [Copilot instruction support matrix](https://docs.github.com/en/copilot/reference/custom-instructions-support).
@@ -89,11 +102,16 @@ Copilot instruction support varies by surface. Copy the baseline into `.github/c
 
 Codex reads `AGENTS.md` automatically but cannot import the baseline.
 
-- **Project:** copy the rules into `AGENTS.md` at the repo root:
+- **Project:** copy the rules into `AGENTS.md` at the repo root. If the file already exists, append instead of overwriting so existing agent instructions are preserved:
 
   ```bash
+  # New file:
   cp ai-secure-coding-baseline.md AGENTS.md
+  # Existing AGENTS.md — append the baseline:
+  cat ai-secure-coding-baseline.md >> AGENTS.md
   ```
+
+  Codex has no import directive and loads at most one instruction file per directory (`AGENTS.override.md`, then `AGENTS.md`, then configured fallback names). To keep the baseline as its own file where **no** `AGENTS.md` exists, register it as a fallback name in `~/.codex/config.toml` (`project_doc_fallback_filenames = ["ai-secure-coding-baseline.md"]`). Because only one file per directory is used, this does not combine with an existing `AGENTS.md`—there, append as above.
 
 - **Your machine:** put them in `~/.codex/AGENTS.md`.
 - **Organization:** distribute a global `AGENTS.md` through endpoint management or include project `AGENTS.md` files in repository templates. Keep enforceable runtime policy separate in managed configuration. See the [Codex `AGENTS.md` guide](https://developers.openai.com/codex/guides/agents-md/) and [admin rollout guide](https://developers.openai.com/codex/enterprise/admin-setup/).
