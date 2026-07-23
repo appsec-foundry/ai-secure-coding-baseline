@@ -6,7 +6,7 @@ A short set of secure-coding rules for AI coding assistants. Drop it into a proj
 >
 > This baseline guides an LLM; it is not an enforceable control or a guarantee of secure code. Supplement it with project-specific instructions and independently validate changes through review, tests, dependency and secret scanning, SAST, and CI or pre-commit checks as appropriate.
 
-The core baseline is deliberately compact: its current 7.9 KB are roughly 2,000 model tokens, while the optional 1.8 KB AI add-on adds roughly 450 more. Exact counts vary by tokenizer, and tools may account for cached input differently. The wording has been repeatedly reviewed, tested in AI-assisted coding tasks, and refined to keep important rules visible with low context overhead; this practical testing is not a formal security certification.
+The core baseline is deliberately compact: ~7.9 KB (roughly 2,000 model tokens); the optional AI add-on adds ~1.8 KB (~450 tokens). Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
 
 ## Why this exists
 
@@ -25,11 +25,9 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 ## The rules
 
-The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md). Its thirteen rules are ordered by risk, with the first four marked non-negotiable:
+The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md): thirteen rules ordered by risk, the first four non-negotiable. They span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, and abuse tests.
 
-They cover access control, untrusted input, secrets and default credentials, preserving existing controls, secure defaults and platform protections, authentication abuse resistance, privilege separation, proven mechanisms, dependency supply chains, errors and logging, resource limits, development versus production, and representative negative or abuse tests.
-
-Before completion, the assistant reviews its diff against the baseline and reports concrete security findings—including fixed issues—affected controls, test results, and unresolved risks or verification gaps as applicable.
+Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues—plus affected controls, test results, and unresolved risks or gaps.
 
 ## Optional AI application add-on
 
