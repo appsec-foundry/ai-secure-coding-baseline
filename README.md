@@ -6,7 +6,7 @@ A short set of secure-coding rules for AI coding assistants. Drop it into a proj
 >
 > This baseline guides an LLM; it is not an enforceable control or a guarantee of secure code. Supplement it with project-specific instructions and independently validate changes through review, tests, dependency and secret scanning, SAST, and CI or pre-commit checks as appropriate.
 
-The core baseline is deliberately compact: its current 7.6 KB are roughly 2,000 model tokens, while the optional 1.8 KB AI add-on adds roughly 450 more. Exact counts vary by tokenizer, and tools may account for cached input differently. The wording has been repeatedly reviewed, tested in AI-assisted coding tasks, and refined to keep important rules visible with low context overhead; this practical testing is not a formal security certification.
+The core baseline is deliberately compact: its current 7.9 KB are roughly 2,000 model tokens, while the optional 1.8 KB AI add-on adds roughly 450 more. Exact counts vary by tokenizer, and tools may account for cached input differently. The wording has been repeatedly reviewed, tested in AI-assisted coding tasks, and refined to keep important rules visible with low context overhead; this practical testing is not a formal security certification.
 
 ## Why this exists
 
