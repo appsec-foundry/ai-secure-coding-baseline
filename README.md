@@ -36,7 +36,7 @@ Before completion, the assistant reviews its diff and reports concrete findingsâ
 
 ## Optional AI application add-on
 
-For a project that builds LLM-powered features, also load [ai-secure-coding-ai-add-on.md](ai-secure-coding-ai-add-on.md). It covers AI-specific risks such as prompt injection, tool authorization, action limits, memory isolation, and the OWASP LLM and Agentic Top 10 reviews. Do not load it for ordinary projects that only use an AI assistant to write code.
+For a project that builds LLM-powered features, also load [ai-secure-coding-llm-add-on.md](ai-secure-coding-llm-add-on.md). It covers AI-specific risks such as prompt injection, tool authorization, action limits, memory isolation, and the OWASP LLM and Agentic Top 10 reviews. Do not load it for ordinary projects that only use an AI assistant to write code.
 
 ## Using it
 
