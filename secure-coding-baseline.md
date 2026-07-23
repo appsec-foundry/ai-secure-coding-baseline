@@ -53,7 +53,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
   - For a greenfield deployable application, or an existing application when the change affects these areas, verify missing or invalid required configuration blocks startup, applicable production controls and headers work, and clean initialization creates no known credential or unintended privileged account.
   - For cookie-based or other ambient browser authentication, test every state-changing browser action—including administrative actions—rejects a missing or invalid CSRF token.
   - Use the existing test framework. Report findings or, if testing is impossible, the reason and residual risk.
-- **LLM-Powered Features:** When a change builds or changes an LLM-powered feature, treat prompts, model and tool outputs, retrieved content, and memory as untrusted—validate them and never let them override policy or authorization. Authorize each tool action server-side with least privilege, bound its side effects, require human approval for consequential or irreversible actions, isolate data and memory across tenants, and review against the OWASP Top 10 for LLM and Agentic Applications.
+- **LLM-Powered Features:** When a change builds or changes an LLM-powered feature, treat prompts, model and tool outputs, retrieved content, and memory as untrusted—validate them and never let them override policy or authorization. Authorize each tool action server-side with least privilege, require human approval for consequential or irreversible actions, isolate data and memory across tenants, and review against the OWASP Top 10 for LLM and Agentic Applications.
 
 ## Before Completion
 
