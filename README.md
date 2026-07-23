@@ -30,13 +30,13 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 ## The rules
 
-The full text is in [ai-secure-coding-baseline.md](ai-secure-coding-baseline.md): a preamble that classifies the work, then thirteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, and abuse tests.
+The full text is in [secure-coding-baseline.md](secure-coding-baseline.md): a preamble that classifies the work, then thirteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, and abuse tests.
 
 Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues—plus affected controls, test results, and unresolved risks or gaps.
 
 ## Optional AI application add-on
 
-For a project that builds LLM-powered features, also load [ai-secure-coding-llm-add-on.md](ai-secure-coding-llm-add-on.md). It covers AI-specific risks such as prompt injection, tool authorization, action limits, memory isolation, and the OWASP LLM and Agentic Top 10 reviews. Do not load it for ordinary projects that only use an AI assistant to write code.
+For a project that builds LLM-powered features, also load [secure-coding-llm-add-on.md](secure-coding-llm-add-on.md). It covers AI-specific risks such as prompt injection, tool authorization, action limits, memory isolation, and the OWASP LLM and Agentic Top 10 reviews. Do not load it for ordinary projects that only use an AI assistant to write code.
 
 ## Using it
 
@@ -47,7 +47,7 @@ Tools load instructions from fixed locations. Apply the same baseline to one pro
 If a tool can be instructed to read another repository file, add this to its normal project-instructions file:
 
 ```markdown
-Before making any code changes, read `ai-secure-coding-baseline.md` in this repository and follow all rules defined there.
+Before making any code changes, read `secure-coding-baseline.md` in this repository and follow all rules defined there.
 ```
 
 This is an instruction to read the file, not a native import; Claude Code's `@` syntax below is the exception.
@@ -56,17 +56,17 @@ This is an instruction to read the file, not a native import; Claude Code's `@` 
 
 Claude Code can import the baseline directly.
 
-- **Project:** put `ai-secure-coding-baseline.md` in the repo and import it from the project `CLAUDE.md`:
+- **Project:** put `secure-coding-baseline.md` in the repo and import it from the project `CLAUDE.md`:
 
   ```markdown
   # CLAUDE.md
-  @ai-secure-coding-baseline.md
+  @secure-coding-baseline.md
   ```
 
 - **Your machine:** do the same import from `~/.claude/CLAUDE.md`, pointing at an absolute path:
 
   ```markdown
-  @/absolute/path/to/ai-secure-coding-baseline.md
+  @/absolute/path/to/secure-coding-baseline.md
   ```
 
 - **Organization:** deploy it as a managed-policy `CLAUDE.md`; managed settings or plugins can add enforceable controls. See the [Claude Code organization setup](https://code.claude.com/docs/en/admin-setup).
@@ -80,16 +80,16 @@ Copilot instruction support varies by surface. Copy the baseline into `.github/c
   ```bash
   mkdir -p .github
   # New file:
-  cp ai-secure-coding-baseline.md .github/copilot-instructions.md
+  cp secure-coding-baseline.md .github/copilot-instructions.md
   # Existing file — append the baseline:
-  cat ai-secure-coding-baseline.md >> .github/copilot-instructions.md
+  cat secure-coding-baseline.md >> .github/copilot-instructions.md
   ```
 
 - **Keep it as a separate file (most surfaces):** place the baseline as its own path-specific instructions file so it loads automatically without touching an existing `copilot-instructions.md`:
 
   ```bash
   mkdir -p .github/instructions
-  { printf -- '---\napplyTo: "**"\n---\n'; cat ai-secure-coding-baseline.md; } \
+  { printf -- '---\napplyTo: "**"\n---\n'; cat secure-coding-baseline.md; } \
     > .github/instructions/secure-coding.instructions.md
   ```
 
@@ -106,19 +106,19 @@ Codex reads `AGENTS.md` automatically but cannot import the baseline.
 
   ```bash
   # New file:
-  cp ai-secure-coding-baseline.md AGENTS.md
+  cp secure-coding-baseline.md AGENTS.md
   # Existing AGENTS.md — append the baseline:
-  cat ai-secure-coding-baseline.md >> AGENTS.md
+  cat secure-coding-baseline.md >> AGENTS.md
   ```
 
-  Codex has no import directive and loads at most one instruction file per directory (`AGENTS.override.md`, then `AGENTS.md`, then configured fallback names). To keep the baseline as its own file where **no** `AGENTS.md` exists, register it as a fallback name in `~/.codex/config.toml` (`project_doc_fallback_filenames = ["ai-secure-coding-baseline.md"]`). Because only one file per directory is used, this does not combine with an existing `AGENTS.md`—there, append as above.
+  Codex has no import directive and loads at most one instruction file per directory (`AGENTS.override.md`, then `AGENTS.md`, then configured fallback names). To keep the baseline as its own file where **no** `AGENTS.md` exists, register it as a fallback name in `~/.codex/config.toml` (`project_doc_fallback_filenames = ["secure-coding-baseline.md"]`). Because only one file per directory is used, this does not combine with an existing `AGENTS.md`—there, append as above.
 
 - **Your machine:** put them in `~/.codex/AGENTS.md`.
 - **Organization:** distribute a global `AGENTS.md` through endpoint management or include project `AGENTS.md` files in repository templates. Keep enforceable runtime policy separate in managed configuration. See the [Codex `AGENTS.md` guide](https://developers.openai.com/codex/guides/agents-md/) and [admin rollout guide](https://developers.openai.com/codex/enterprise/admin-setup/).
 
 ### Keeping the copies in sync
 
-Keep `ai-secure-coding-baseline.md` as the source of truth and generate copied instruction files from it to prevent drift. An organization template can provide those files to new repositories.
+Keep `secure-coding-baseline.md` as the source of truth and generate copied instruction files from it to prevent drift. An organization template can provide those files to new repositories.
 
 ## Background
 
