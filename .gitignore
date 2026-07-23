@@ -1,0 +1,21 @@
+# Local environment and tooling artifacts (not part of this project)
+
+# Shell startup files
+.bash_profile
+.bashrc
+.profile
+.zprofile
+.zshrc
+
+# Editor / IDE
+.idea/
+.vscode/
+
+# Assistant / tooling config
+.claude/
+.mcp.json
+.ripgreprc
+
+# Stray git config artifacts
+.gitconfig
+.gitmodules
