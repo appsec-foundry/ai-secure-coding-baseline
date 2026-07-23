@@ -96,7 +96,7 @@ Copilot instruction support varies by surface. Copy the baseline into `.github/c
   `applyTo: "**"` applies it repository-wide. Path-specific `.github/instructions/**/*.instructions.md` files are supported by the Copilot cloud agent and most Chat and code-review surfaces, but not all (for example, Eclipse Chat reads only `copilot-instructions.md`). For guaranteed coverage everywhere, use `copilot-instructions.md` above.
 
 - **Your account:** paste it into personal custom instructions for Copilot Chat on GitHub.
-- **Organization:** add it as organization custom instructions for supported GitHub.com features. See the [Copilot instruction support matrix](https://docs.github.com/en/copilot/reference/custom-instructions-support).
+- **Organization:** paste it into organization custom instructions (Organization settings → Copilot → Custom instructions). Applies only to GitHub.com surfaces—Chat, code review, and the coding agent—not the IDE, which still needs the repository file above. See [organization custom instructions](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-organization-instructions) and the [support matrix](https://docs.github.com/en/copilot/reference/custom-instructions-support).
 
 ### OpenAI Codex
 
