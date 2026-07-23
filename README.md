@@ -11,7 +11,7 @@ A short set of secure-coding rules for AI coding assistants. Add it to a project
 >
 > This baseline guides an LLM; it is not an enforceable control or a guarantee of secure code. Supplement it with project-specific instructions and independently validate changes through review, tests, dependency and secret scanning, SAST, and CI or pre-commit checks as appropriate.
 
-The core baseline is deliberately compact: ~7.9 KB (roughly 2,000 model tokens); the optional AI application add-on adds ~1.8 KB (~450 tokens). Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
+The baseline is deliberately compact: ~8.3 KB (roughly 2,100 model tokens), including one condensed rule for LLM-powered features. Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
 
 ## Why this exists
 
@@ -26,17 +26,13 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 - **Common application risks:** major classes also represented in the [OWASP Top 10:2025](https://owasp.org/Top10/2025/), including access control, misconfiguration, supply-chain and integrity failures, cryptography, injection, insecure design, authentication, logging, and error handling.
 - **AI-assisted coding risks:** package hallucinations and slopsquatting through independent, current verification instead of model confidence or package existence alone, plus unsafe scope expansion and weakened controls. See the [OWASP npm Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/NPM_Security_Cheat_Sheet.html#slopsquatting-attacks).
 - **Dependency supply chains:** unnecessary or unverified packages, unexpected transitive changes, unreviewed install scripts, missing lockfiles, non-reproducible builds, and absent dependency scanning.
-- **LLM application risks:** when the optional add-on is loaded, prompt injection, unsafe model output and tool use, excessive agency, and data or memory exposure, reviewed against the [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/) and [OWASP Top 10 for Agentic Applications](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/).
+- **LLM application risks:** prompt injection, unsafe model output and tool use, excessive agency, and data or memory exposure—covered by one condensed rule in the baseline—reviewed against the [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/) and [OWASP Top 10 for Agentic Applications](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/).
 
 ## The rules
 
-The full text is in [secure-coding-baseline.md](secure-coding-baseline.md): a preamble that classifies the work, then thirteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, and abuse tests.
+The full text is in [secure-coding-baseline.md](secure-coding-baseline.md): a preamble that classifies the work, then fourteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, privilege separation, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, abuse tests, and LLM-powered features.
 
 Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues—plus affected controls, test results, and unresolved risks or gaps.
-
-## Optional AI application add-on
-
-For a project that builds LLM-powered features, also load [secure-coding-llm-add-on.md](secure-coding-llm-add-on.md). It covers AI-specific risks such as prompt injection, tool authorization, action limits, memory isolation, and the OWASP LLM and Agentic Top 10 reviews. Do not load it for ordinary projects that only use an AI assistant to write code.
 
 ## Using it
 
