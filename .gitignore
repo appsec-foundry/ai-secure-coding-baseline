@@ -8,8 +8,8 @@
 .zshrc
 
 # Editor / IDE
-.idea/
-.vscode/
+.idea
+.vscode
 
 # Assistant / tooling config
 .claude/
