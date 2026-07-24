@@ -20,9 +20,11 @@ The baseline is deliberately compact: ~8.3 KB (roughly 2,100 model tokens), incl
 
 ## Why this exists
 
-AI assistants can cut security corners in predictable ways: disable a check to get a test green, import a package that does not exist, log a secret, trust unvalidated input, expose a stack trace, or rewrite unrelated working code. Clear project guidance makes secure choices more consistent.
+Modern AI coding assistants get a lot right, but they do not apply security requirements consistently. Research shows that models often produce safer code when security expectations are stated explicitly, suggesting a gap between knowing secure practices and reliably using them.
 
-For existing applications, the baseline stays within the changed code, reuses project controls, and reports relevant pre-existing issues instead of silently fixing them. For greenfield work, it requires applicable controls and tests as part of the design.
+That gap matters most under pressure. When the goal becomes “make the test pass” or “finish quickly,” assistants are more likely to take unsafe shortcuts, such as weakening checks, skipping validation, or introducing risky dependencies. Studies including Yan et al. (2025), AgentPressureBench, and Scheurer, Balesni, and Hobbhahn (2024) support this pattern. 
+
+Clear project guidance makes secure choices more consistent. For existing applications, the baseline stays within the changed code, reuses project controls, and reports relevant pre-existing issues instead of silently fixing them. For greenfield work, it requires applicable controls and tests as part of the design.
 
 ## Covered risks
 
