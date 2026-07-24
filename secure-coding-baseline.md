@@ -39,6 +39,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
 - **Privilege Separation:** Run privileged operations under a separate identity with only the permissions they need; do not widen an existing context to reach them.
 - **Proven Mechanisms:** Reuse established sound mechanisms and maintained libraries; flag weak ones. Never hand-roll crypto, authentication, or sessions.
   - Use vetted algorithms and a CSPRNG; no MD5/SHA-1 for security, insecure RNGs for tokens, or fast password hashes—use Argon2, scrypt, bcrypt, or PBKDF2 with sound parameters.
+  - For federated auth (OAuth 2.0 / OIDC), delegate to a maintained library and use the authorization-code flow with PKCE; never the implicit flow. Validate `state`, exact-match `redirect_uri` against an allow-list, and each token's `iss`, `aud`, `exp`, and signature; request least-privilege scopes and rotate refresh tokens.
   - Enforce the password-hash algorithm's input limit on the UTF-8 byte representation before hashing or verification; reject excess input rather than silently truncating or relying on library behavior (bcrypt's limit is 72 bytes); when applying this to an existing credential store, enforce it at password set or change without locking out accounts created under prior truncation.
 - **Dependencies:** Prefer existing dependencies.
   - Before adding or executing a new package, verify its exact name and expected upstream source using current authoritative information; package existence or model confidence alone is not proof of trust.
