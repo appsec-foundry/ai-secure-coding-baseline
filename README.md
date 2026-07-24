@@ -24,8 +24,6 @@ Modern AI coding assistants get a lot right, but they do not apply security requ
 
 That gap matters most under pressure. When the goal becomes “make the test pass” or “finish quickly,” assistants are more likely to take unsafe shortcuts, such as weakening checks, skipping validation, or introducing risky dependencies. Studies including Yan et al. (2025), AgentPressureBench, and Scheurer, Balesni, and Hobbhahn (2024) support this pattern. 
 
-Clear project guidance makes secure choices more consistent. For existing applications, the baseline stays within the changed code, reuses project controls, and reports relevant pre-existing issues instead of silently fixing them. For greenfield work, it requires applicable controls and tests as part of the design.
-
 ## Covered risks
 
 This is a compact guardrail, not a complete standard or compliance checklist. It addresses:
