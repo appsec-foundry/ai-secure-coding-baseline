@@ -19,9 +19,9 @@ The baseline is deliberately compact: ~8.6 KB (roughly 2,200 model tokens), incl
 
 ## Why this exists
 
-Modern AI coding assistants get a lot right, but they do not apply security requirements consistently. Research shows that models often produce safer code when security expectations are stated explicitly, suggesting a gap between knowing secure practices and reliably using them.
+Modern AI coding assistants get a lot right, but they do not apply security requirements consistently. [Yan et al. (2025)](https://arxiv.org/abs/2506.23034) find that models are prone to generating insecure code yet produce safer code once security expectations are made explicit, suggesting a gap between knowing secure practices and reliably using them.
 
-That gap matters most under pressure. When the goal becomes “make the test pass” or “finish quickly,” assistants are more likely to take unsafe shortcuts, such as weakening checks, skipping validation, or introducing risky dependencies. Studies including Yan et al. (2025), AgentPressureBench, and Scheurer, Balesni, and Hobbhahn (2024) support this pattern. 
+That gap matters most under pressure. When the goal becomes “make the test pass” or “finish quickly,” assistants are more likely to take unsafe shortcuts, such as weakening checks, skipping validation, or introducing risky dependencies. [Chen et al. (2026)](https://arxiv.org/abs/2604.20200) show this with AgentPressureBench, where repeated user pressure to raise a score induces shortcut behavior across every task, and [Scheurer, Balesni, and Hobbhahn (2023)](https://arxiv.org/abs/2311.07590) show the same pattern outside coding.
 
 ## Covered risks
 
@@ -73,9 +73,9 @@ Claude Code can import the baseline directly.
 
 ### GitHub Copilot
 
-Copilot instruction support varies by surface. Copy the baseline into `.github/copilot-instructions.md` for broad repository coverage.
+Copilot instruction support varies by surface; `.github/copilot-instructions.md` is the most broadly supported location.
 
-- **Project:** copy them into `.github/copilot-instructions.md`. If the file already exists, append instead of overwriting so existing instructions are preserved:
+- **Project:** copy the baseline into `.github/copilot-instructions.md`. If the file already exists, append instead of overwriting so existing instructions are preserved:
 
   ```bash
   mkdir -p .github
@@ -122,7 +122,7 @@ Keep `secure-coding-baseline.md` as the source of truth and generate copied inst
 
 ## Background
 
-[Scheurer, Balesni, and Hobbhahn (2024)](https://arxiv.org/abs/2311.07590) show that instructions can reduce, but not eliminate, undesirable behavior in a pressured scenario. [Wallace et al. (2024)](https://arxiv.org/abs/2404.13208) describe how instruction-hierarchy training can improve robustness.
+[Scheurer, Balesni, and Hobbhahn (2023)](https://arxiv.org/abs/2311.07590) show that instructions can reduce, but not eliminate, undesirable behavior in a pressured scenario. [Wallace et al. (2024)](https://arxiv.org/abs/2404.13208) describe how instruction-hierarchy training can improve robustness.
 
 ## License
 
