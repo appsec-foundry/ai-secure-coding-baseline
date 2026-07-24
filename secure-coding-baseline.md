@@ -23,6 +23,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
   - Never commit or expose real secrets, or log credentials, tokens, or PII.
   - Never ship, seed, initialize, display, or document working default, demo, or shared accounts or credentials—especially privileged—including through bundled data, setup, fixtures, UI, or docs.
   - Bootstrap must use unique externally supplied credentials or one-time activation. Artificial credentials belong only in isolated tests or non-runnable examples.
+  - For a first administrative account, require the credential from external configuration and fail startup when it is absent, or generate a random one at first start and emit it once to the operator console—never to application logs or the UI. A placeholder the user is merely advised to change is still a shipped default.
   - Persistent security keys must come from external configuration or secret management, remain stable across processes, instances, and restarts until explicit rotation, and be required at startup; never substitute ephemeral keys.
 - **Preserve Security:** Never weaken a control to make code work or tests pass. Report significant security decisions and any risk, assumption, trade-off, or verification gap introduced or left unresolved.
 
@@ -30,6 +31,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
 
 - **Secure by Default:** Least privilege, deny-by-default, smallest attack surface; fail closed on missing, invalid, or ambiguous security context.
   - Production configurations must enable applicable platform protections; weaker development settings must be explicit and local-only.
+  - Carry all traffic that leaves the local machine over TLS; plain HTTP is acceptable only on the loopback interface. Bind to loopback by default. Make a non-loopback bind require TLS to be in place—terminated by the application, or by an upstream terminator declared through required configuration—and fail startup when it is unconfigured; an assumed terminator is an absent one. With a non-loopback bind, enable `Secure` cookies, HSTS, and matching proxy trust, and let any plain-HTTP listener do nothing but redirect. When exposure beyond localhost is out of scope, say so and name the TLS step required before it.
   - For browser content, use `Secure`, `HttpOnly`, appropriate `SameSite`, CSP, HSTS, `X-Content-Type-Options`, and framing restrictions, introducing or tightening them incrementally so existing pages and intended embedding keep working; document whether the application or deployment layer enforces them.
   - Restrict CORS to an explicit origin allow-list matched exactly, and expose only the methods and headers actually needed; never reflect the request `Origin` back and never combine a wildcard with credentials.
 - **Authentication Abuse Resistance:**
@@ -64,6 +66,6 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
 
 - **Review and Report:** Review the changed diff and fix introduced findings.
   - Actively notify the user of every concrete security issue found in scope, including issues already fixed, with its location, realistic impact, status, and next step.
-  - For security-relevant changes, also summarize affected controls, tests and results, and anything left unresolved; say when none remain.
+  - Close the response that delivers the work with a short security note of a few lines, even when nothing was found: the controls the change relies on, tests and results, what was deliberately left out, and residual risk or verification gaps; say plainly when none remain. Keep it proportional to the change.
   - For greenfield work, report readiness for the applicable controls required before the first production release.
   - Do not call an existing-application scoped review a full security audit.
