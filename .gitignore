@@ -19,3 +19,7 @@
 # Stray git config artifacts
 .gitconfig
 .gitmodules
+
+# Baseline test runs (regenerated, sometimes large)
+tests/results/
+__pycache__/

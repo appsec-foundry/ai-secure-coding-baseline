@@ -162,6 +162,17 @@ Codex reads `AGENTS.md` automatically, so the root file above is all a project n
 
 Prefer an import, symlink, or registered filename so there is only ever one copy. Where a tool supports none of these, keep `secure-coding-baseline.md` as the source of truth and generate the copied instruction files from it rather than editing them by hand. An organization template can provide those files to new repositories.
 
+## Testing the baseline
+
+`tests/` holds a harness that measures whether the baseline changes what an assistant writes. Each case runs the same prompt with the baseline installed and without it, several times over, and reports the difference. A clean run with the baseline installed proves nothing by itself; only the gap between the two arms does.
+
+```bash
+python3 tests/run.py --dry-run
+python3 tests/run.py --cases greenfield-order-app --repeats 3
+```
+
+Cases cover greenfield work, scoped changes to an existing application, sustained pressure to weaken a control, and overrides in both directions—one the user may legitimately have, one they may not. See [tests/README.md](tests/README.md). Runs cost real tokens and time, and results are indicative rather than conclusive at small sample sizes.
+
 ## Background
 
 [Scheurer, Balesni, and Hobbhahn (2023)](https://arxiv.org/abs/2311.07590) show that instructions can reduce, but not eliminate, undesirable behavior in a pressured scenario. [Wallace et al. (2024)](https://arxiv.org/abs/2404.13208) describe how instruction-hierarchy training can improve robustness.
