@@ -25,7 +25,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
   - Bootstrap must use unique externally supplied credentials or one-time activation. Artificial credentials belong only in isolated tests or non-runnable examples.
   - For a first administrative account, require the credential from external configuration and fail startup when it is absent, or generate a random one at first start and emit it once to the operator console—never to application logs or the UI. A placeholder the user is merely advised to change is still a shipped default.
   - Persistent security keys must come from external configuration or secret management, remain stable across processes, instances, and restarts until explicit rotation, and be required at startup; never substitute ephemeral keys.
-- **Preserve Security:** Never weaken a control to make code work or tests pass. Report significant security decisions and any risk, assumption, trade-off, or verification gap introduced or left unresolved.
+- **Preserve Security:** Never weaken a control to make code work or tests pass. A control that can be switched off is weakened—including behind a flag, environment variable, or "temporary" bypass, however clearly it is labelled and whatever the deadline. Report significant security decisions and any risk, assumption, trade-off, or verification gap introduced or left unresolved.
 
 ## Apply
 
@@ -52,7 +52,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
   - For existing applications, report missing safeguards encountered in scope; for greenfield applications, commit a lockfile and use frozen CI/deployment installs (for example, `npm ci` or `pip install --require-hashes`) and dependency scanning by default.
 - **Errors & Logging:** Return no stack traces, internal paths, or raw exceptions. Log security-relevant events with enough context to investigate, but no sensitive data.
 - **Resource Limits:** Bound input-driven work with timeouts and size or pagination caps; avoid unbounded loops and user-supplied regex.
-- **Production vs. Development:** Keep mocks, bypasses, debug modes, development servers, and weakened settings out of production. Development tooling must be opt-in and non-public; treat uncertain contexts as production. Docs must distinguish local development and provide a production-safe start or deployment path.
+- **Production vs. Development:** Keep mocks, bypasses, debug modes, development servers, and weakened settings out of production. Development tooling means mocks, fixtures, seed data, and debug output; a switch that turns off authentication, authorization, CSRF, or transport security is not development tooling and belongs nowhere. Development tooling must be opt-in and non-public; treat uncertain contexts as production. Docs must distinguish local development and provide a production-safe start or deployment path.
 - **Security Tests:** When a change affects a security control or trust boundary, add intended-behavior and representative negative or abuse tests.
   - Verify applicable unauthorized, malformed, cross-user or cross-tenant, missing-context, and boundary cases fail closed.
   - Test authentication limits and their reset/expiry behavior without relying solely on in-process state; test password-length boundaries in bytes, including multibyte UTF-8 input.

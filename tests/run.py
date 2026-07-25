@@ -28,6 +28,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -50,6 +51,42 @@ SKIP_NAMES = {"CLAUDE.md", "AGENTS.md", "package-lock.json", "yarn.lock",
 MAX_FILE_BYTES = 400_000
 MAX_BUNDLE_BYTES = 200_000
 REPLY_FILE = "_agent_reply.txt"
+
+
+# Output that means the account is out of budget, not that the case failed.
+LIMIT_PATTERNS = re.compile(
+    r"session limit|usage limit|rate limit|quota exceeded|"
+    r"insufficient credit|too many requests", re.IGNORECASE)
+
+
+class QuotaExhausted(Exception):
+    """Raised to stop the whole matrix instead of burning it on empty runs."""
+
+
+def run_capture(cmd, cwd: Path, timeout: int, shell: bool = False):
+    """subprocess.run with a timeout that actually ends the process.
+
+    subprocess.run kills only the direct child on timeout and then keeps
+    waiting for stdout to close, which a surviving grandchild holds open. A CLI
+    that spawns helpers can hang there for hours past its timeout, so the child
+    gets its own process group and the group is killed as a whole.
+    """
+    proc = subprocess.Popen(cmd, cwd=cwd, shell=shell, text=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL, start_new_session=True)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+        return proc.returncode, out, err
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            proc.kill()
+        try:
+            out, err = proc.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            out, err = "", ""
+        return -1, out, err
 
 
 # --------------------------------------------------------------------------
@@ -280,13 +317,13 @@ def run_judge(files: dict[str, str], reply: str, questions: list[dict],
         cmd = ["claude", "-p", prompt]
         if model:
             cmd += ["--model", model]
-        try:
-            proc = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True,
-                                  timeout=timeout, stdin=subprocess.DEVNULL)
-        except subprocess.TimeoutExpired:
-            return errors("judge timed out")
+        rc, out, err = run_capture(cmd, Path(tmp), timeout)
+    if rc == -1:
+        return errors("judge timed out")
+    if rc != 0 and LIMIT_PATTERNS.search(out + err):
+        raise QuotaExhausted((out + err).strip()[:200])
 
-    m = re.search(r"\[.*\]", proc.stdout, re.DOTALL)
+    m = re.search(r"\[.*\]", out, re.DOTALL)
     if not m:
         return errors("unparseable judge reply")
     try:
@@ -355,13 +392,8 @@ def run_verify(workdir: Path, verify: dict, timeout: int) -> dict | None:
     """
     if not verify:
         return None
-    try:
-        proc = subprocess.run(verify["cmd"], shell=True, cwd=workdir,
-                              capture_output=True, text=True, timeout=timeout,
-                              stdin=subprocess.DEVNULL)
-        rc, out = proc.returncode, (proc.stdout + proc.stderr)[-4000:]
-    except subprocess.TimeoutExpired:
-        rc, out = -1, "verify timed out"
+    rc, out, err = run_capture(verify["cmd"], workdir, timeout, shell=True)
+    out = (out + err)[-4000:] if rc != -1 else "verify timed out"
     return {"id": f"verify: {verify['cmd']}", "kind": "verify",
             "violated": rc != verify.get("expect_exit", 0),
             "note": f"exit {rc}", "hits": [{"file": "stdout", "match": out[-400:]}]}
@@ -382,15 +414,17 @@ def run_one(case: dict, tool: str, arm: str, rep: int, args) -> dict:
     replies, turn_codes, log = [], [], ""
     for turn, prompt in enumerate(case["turns"], start=1):
         cmd = ADAPTERS[tool]["cmd"](workdir, prompt, args.model, turn)
-        try:
-            proc = subprocess.run(cmd, cwd=workdir, capture_output=True,
-                                  text=True, timeout=args.timeout,
-                                  stdin=subprocess.DEVNULL)
-            stdout, rc = proc.stdout, proc.returncode
-            log += f"\n===== turn {turn} (exit {rc}) =====\n" + proc.stdout + proc.stderr
-        except subprocess.TimeoutExpired:
-            stdout, rc = "", -1
-            log += f"\n===== turn {turn} TIMEOUT =====\n"
+        rc, stdout, stderr = run_capture(cmd, workdir, args.timeout)
+        log += (f"\n===== turn {turn} "
+                f"({'TIMEOUT' if rc == -1 else f'exit {rc}'}) =====\n"
+                + stdout + stderr)
+
+        # A quota wall produces runs that look like clean passes. Stop the whole
+        # matrix rather than filling a report with them.
+        hit = LIMIT_PATTERNS.search(stdout + stderr)
+        if hit and rc != 0:
+            (workdir / "_agent_stdout.log").write_text(log, encoding="utf-8")
+            raise QuotaExhausted((stdout + stderr).strip()[:200])
 
         turn_codes.append(rc)
         if ADAPTERS[tool]["reply"] == "file":
@@ -469,7 +503,11 @@ def write_report(runs: list[dict], agg: dict, outdir: Path, args) -> Path:
              f"- Repeats per arm: {args.repeats}",
              f"- Assistant model: {args.model or 'tool default'}",
              f"- Judge: {'off' if args.no_judge else (args.judge_model or 'claude default')}",
-             "",
+             ""]
+    if getattr(args, "aborted", None):
+        lines += [f"> **Incomplete matrix.** The run stopped early: {args.aborted}",
+                  "> Whatever is below covers fewer runs than the settings say.", ""]
+    lines += [
              "Cells are violations / runs. `control` is the same prompt with no",
              "baseline installed. A check only says something about the baseline",
              "where the two columns differ.",
@@ -582,14 +620,38 @@ def main() -> int:
 
     Path(args.workroot).mkdir(parents=True, exist_ok=True)
     started = time.time()
+    runs: list[dict] = []
+    aborted = None
     if args.parallel > 1:
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.parallel) as ex:
-            runs = list(ex.map(lambda j: run_one(*j, args), jobs))
+            futures = [ex.submit(run_one, *j, args) for j in jobs]
+            for fut in concurrent.futures.as_completed(futures):
+                try:
+                    runs.append(fut.result())
+                except QuotaExhausted as exc:
+                    aborted = str(exc)
+                    for f in futures:
+                        f.cancel()  # already-running ones still finish
+                    break
     else:
-        runs = [run_one(*j, args) for j in jobs]
+        for j in jobs:
+            try:
+                runs.append(run_one(*j, args))
+            except QuotaExhausted as exc:
+                aborted = str(exc)
+                break
+
+    if aborted:
+        print(f"\nSTOPPED — the account is out of budget, not the cases:\n"
+              f"  {aborted}\n"
+              f"{len(runs)} of {len(jobs)} runs finished before that. Anything\n"
+              f"after the wall would have looked like a clean pass.")
+    if not runs:
+        return 1
 
     outdir = RESULTS_DIR / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     outdir.mkdir(parents=True, exist_ok=True)
+    args.aborted = aborted
     report = write_report(runs, aggregate(runs), outdir, args)
 
     if not args.keep:

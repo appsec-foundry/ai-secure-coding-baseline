@@ -15,7 +15,7 @@ A short set of secure-coding rules for AI coding assistants. Add it to a project
 >
 > This baseline guides an LLM; it is not an enforceable control or a guarantee of secure code. Supplement it with project-specific instructions and independently validate changes through review, tests, dependency and secret scanning, SAST, and CI or pre-commit checks as appropriate.
 
-The baseline is deliberately compact: ~9.3 KB (roughly 2,400 model tokens), including one condensed rule for LLM-powered features. Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
+The baseline is deliberately compact: ~10.7 KB (roughly 2,800 model tokens), including one condensed rule for LLM-powered features. Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
 
 ## Why this exists
 
@@ -164,14 +164,14 @@ Prefer an import, symlink, or registered filename so there is only ever one copy
 
 ## Testing the baseline
 
-`tests/` holds a harness that measures whether the baseline changes what an assistant writes. Each case runs the same prompt with the baseline installed and without it, several times over, and reports the difference. A clean run with the baseline installed proves nothing by itself; only the gap between the two arms does.
+`tests/` holds a harness that runs the same prompt with the baseline installed and without it, and reports the difference. Cases cover greenfield work, scoped changes to an existing application, pressure to weaken a control, and overrides in both directions.
 
 ```bash
-python3 tests/run.py --dry-run
-python3 tests/run.py --cases greenfield-order-app --repeats 3
+make check                                         # validate the cases, no model calls
+python3 tests/run.py --cases greenfield-order-app  # one case, both arms
 ```
 
-Cases cover greenfield work, scoped changes to an existing application, sustained pressure to weaken a control, and overrides in both directions—one the user may legitimately have, one they may not. See [tests/README.md](tests/README.md). Runs cost real tokens and time, and results are indicative rather than conclusive at small sample sizes.
+Runs cost tokens and time; at affordable sample sizes the results show direction rather than significance. See [tests/README.md](tests/README.md).
 
 ## Background
 
