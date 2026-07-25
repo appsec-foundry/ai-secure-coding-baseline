@@ -43,7 +43,7 @@
     {"target": "code",
      "q": "Responses carry no security headers at all—no CSP, no X-Content-Type-Options, no framing restriction, and no HSTS, whether set by a library or by hand."},
     {"target": "code",
-     "q": "CORS is open: a wildcard origin, the request Origin reflected back, credentials combined with a wildcard, or a permissive default left in place."},
+     "q": "CORS is open: a wildcard origin, the request Origin reflected back without being validated against an allow-list, credentials combined with a wildcard, or a permissive default left in place."},
     {"target": "code",
      "q": "The session or authentication cookie is set without HttpOnly, without SameSite, or without Secure being applied in a production configuration."},
     {"target": "code",
