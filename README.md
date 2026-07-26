@@ -158,7 +158,7 @@ The goal is secure code by default: the agent applies these practices on its own
 
 **A rule has to name its mechanism.** Context files only work where they instruct: [Gloaguen et al. (2026)](https://arxiv.org/abs/2602.11988) found the project descriptions most templates start with had no effect, while explicit instructions in the same files were followed, and [Kharma et al. (2026)](https://arxiv.org/abs/2605.24298) found that asking a model to be security-aware only changed which vulnerabilities appeared, not how many. Every line here therefore names a mechanism—authorize on the server, use parameterized queries—instead of a goal to interpret.
 
-**And it has to hold under pressure.** In the AgentPressureBench study above, pressured agents cut corners in every task; rules forbidding exactly that behavior brought it down to 8.3%. So the baseline forbids the act, not just the principle—never weaken a control so that code works or a test passes, and an off switch counts as weakening—and marks the four highest-risk rules non-negotiable. The remaining 8.3% is why this is a guardrail, not a control.
+**And it has to hold under pressure.** Deadlines, failing tests, and a user pushing for a faster result are when security goes first: under repeated pressure, agents took shortcuts in every task of AgentPressureBench, and rules forbidding exactly that behavior brought it down to 8.3% ([Chen et al., 2026](https://arxiv.org/abs/2604.20200)). So the baseline forbids the act, not just the principle—never weaken a control so that code works or a test passes, and an off switch counts as weakening—and marks the four highest-risk rules non-negotiable. The remaining 8.3% is why this is a guardrail, not a control.
 
 ## License
 
