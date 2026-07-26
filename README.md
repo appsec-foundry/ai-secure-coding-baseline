@@ -40,41 +40,9 @@ Before completion, the assistant reviews its diff and reports concrete findings�
 
 ## Using it
 
-Tools load instructions from fixed locations. Apply the same baseline to one project, your machine or account, or an organization.
+Every tool loads project instructions from its own fixed locations, so installing the baseline means putting it where the tool already looks. Three cases cover the field: **Claude Code**, which reads only its own files; **GitHub Copilot**, which uses its own locations on several surfaces; and **every other agent**, which reads the shared [`AGENTS.md`](https://agents.md/).
 
-Most assistants now read [`AGENTS.md`](https://agents.md/), an open format stewarded by the Agentic AI Foundation under the Linux Foundation. Claude Code is the notable exception and needs one extra line.
-
-Keep `secure-coding-baseline.md` as the one real file and reference it from each tool's location. Copying works too, but every copy is a chance to drift. Mechanisms, strongest first:
-
-| Mechanism | Tools | Notes |
-|---|---|---|
-| Native import | Claude Code | `@secure-coding-baseline.md`—resolved at load time |
-| Symlink | any file-based location | one file on disk; needs Git symlink support |
-| Config-registered filename | Codex | only where no `AGENTS.md` exists |
-| Pointer instruction | tools that can read repository files | the assistant must choose to read it; not guaranteed |
-| Copy or append | everything else | reliable, but must be kept in sync |
-
-### `AGENTS.md` for most tools
-
-`AGENTS.md` is plain Markdown with no import directive—nested files in subdirectories are its only composition mechanism. To avoid a second copy, symlink it, the approach the [agents.md FAQ](https://agents.md/) itself suggests for reusing an existing file:
-
-```bash
-# One file on disk, two names:
-ln -s secure-coding-baseline.md AGENTS.md
-```
-
-Git stores the symlink, so clones get it too—but a Windows checkout without Developer Mode or `core.symlinks=true` silently turns it into a text file containing the target path, and the rules never load. Verify after cloning, or copy instead on Windows:
-
-```bash
-# New file:
-cp secure-coding-baseline.md AGENTS.md
-# Existing AGENTS.md — append the baseline:
-cat secure-coding-baseline.md >> AGENTS.md
-```
-
-Where an `AGENTS.md` already exists, a symlink cannot merge with it—append, or add a pointer line to the existing file (see [Tools that read neither](#tools-that-read-neither)).
-
-Per the [agents.md compatibility list](https://agents.md/) this covers Codex, Cursor, Gemini CLI, GitHub Copilot's coding agent, VS Code, Devin, Jules, Junie, Factory, Amp, Zed, Warp, Aider, goose, opencode, Windsurf, RooCode, Kilo Code and others. Support is declared per tool, not guaranteed by the format—confirm it on the surfaces you actually use.
+Keep `secure-coding-baseline.md` as the one real file and reference it from each location. Claude Code can import it directly, most other tools need a symlink, and only where neither works should you copy—every copy is a chance to drift. Each mechanism works the same way for a single project, for your machine or account, and for an organization.
 
 ### Claude Code
 
@@ -110,19 +78,9 @@ An instruction file that is never loaded fails silently—the assistant behaves 
 - `claude --debug` — logs instruction-file discovery and import resolution at startup.
 - After the fact: `grep -c "Non-negotiable" ~/.claude/projects/<project-slug>/<session-id>.jsonl`. A `0` means the baseline was never in context.
 
-### Tools that read neither
-
-If a tool reads no shared format but can be instructed to read a repository file, add this to its normal project-instructions file:
-
-```markdown
-Before making any code changes, read `secure-coding-baseline.md` in this repository and follow all rules defined there.
-```
-
-This is an instruction to read the file, not a native import; Claude Code's `@` syntax above is the exception.
-
 ### GitHub Copilot
 
-Copilot's coding agent and VS Code are on the agents.md list, so the root `AGENTS.md` above already covers them. The remaining surfaces read Copilot's own locations, and support varies; `.github/copilot-instructions.md` is the most broadly supported.
+Copilot's coding agent and VS Code are on the agents.md list, so the root `AGENTS.md` described [below](#every-other-agent) already covers them. The remaining surfaces read Copilot's own locations, and support varies; `.github/copilot-instructions.md` is the most broadly supported.
 
 - **Project:** copy the baseline into `.github/copilot-instructions.md`. If the file already exists, append instead of overwriting so existing instructions are preserved:
 
@@ -147,16 +105,37 @@ Copilot's coding agent and VS Code are on the agents.md list, so the root `AGENT
 - **Your account:** paste it into personal custom instructions for Copilot Chat on GitHub.
 - **Organization:** paste it into organization custom instructions (Organization settings → Copilot → Custom instructions). Applies only to GitHub.com surfaces—Chat, code review, and the coding agent—not the IDE, which still needs the repository file above. See [organization custom instructions](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-organization-instructions) and the [support matrix](https://docs.github.com/en/copilot/reference/custom-instructions-support).
 
-### OpenAI Codex
+### Every other agent
 
-Codex reads `AGENTS.md` automatically, so the root file above is all a project needs. It has no import directive, so the rules must reach it through the filename itself—symlink, registered fallback name, or copy.
+Everything that is not Claude Code reads [`AGENTS.md`](https://agents.md/), an open format stewarded by the Agentic AI Foundation under the Linux Foundation. Per the [compatibility list](https://agents.md/) that covers Codex, Cursor, Gemini CLI, GitHub Copilot's coding agent, VS Code, Devin, Jules, Junie, Factory, Amp, Zed, Warp, Aider, goose, opencode, Windsurf, RooCode, Kilo Code and others. Support is declared per tool, not guaranteed by the format—confirm it on the surfaces you actually use.
 
-- **Project:** covered by the root `AGENTS.md` above.
+`AGENTS.md` is plain Markdown with no import directive; nested files in subdirectories are its only composition mechanism. To avoid a second copy, symlink it, the approach the [agents.md FAQ](https://agents.md/) itself suggests for reusing an existing file:
 
-- **Preferred, no second file:** Codex loads at most one instruction file per directory (`AGENTS.override.md`, then `AGENTS.md`, then configured fallback names). Where **no** `AGENTS.md` exists, register the baseline as a fallback name in `~/.codex/config.toml` (`project_doc_fallback_filenames = ["secure-coding-baseline.md"]`). Because only one file per directory is used, this does not combine with an existing `AGENTS.md`—there, append as above.
+```bash
+# One file on disk, two names:
+ln -s secure-coding-baseline.md AGENTS.md
+```
 
-- **Your machine:** put them in `~/.codex/AGENTS.md`.
-- **Organization:** distribute a global `AGENTS.md` through endpoint management or include project `AGENTS.md` files in repository templates. Keep enforceable runtime policy separate in managed configuration. See the [Codex `AGENTS.md` guide](https://developers.openai.com/codex/guides/agents-md/) and [admin rollout guide](https://developers.openai.com/codex/enterprise/admin-setup/).
+Git stores the symlink, so clones get it too—but a Windows checkout without Developer Mode or `core.symlinks=true` silently turns it into a text file containing the target path, and the rules never load. Verify after cloning, or copy instead on Windows:
+
+```bash
+# New file:
+cp secure-coding-baseline.md AGENTS.md
+# Existing AGENTS.md — append the baseline:
+cat secure-coding-baseline.md >> AGENTS.md
+```
+
+Where an `AGENTS.md` already exists, a symlink cannot merge with it—append, as above.
+
+**Codex** needs nothing beyond the root file, with two additions. It loads at most one instruction file per directory (`AGENTS.override.md`, then `AGENTS.md`, then configured fallback names), so where **no** `AGENTS.md` exists you can skip the symlink and register the baseline's own filename in `~/.codex/config.toml` instead: `project_doc_fallback_filenames = ["secure-coding-baseline.md"]`. For your machine, use `~/.codex/AGENTS.md`; for an organization, distribute a global `AGENTS.md` through endpoint management or ship project `AGENTS.md` files in repository templates, keeping enforceable runtime policy separate in managed configuration. See the [Codex `AGENTS.md` guide](https://developers.openai.com/codex/guides/agents-md/) and [admin rollout guide](https://developers.openai.com/codex/enterprise/admin-setup/).
+
+**Tools that read no shared format** can often still be told to read a repository file. Add this to whatever project-instructions file they do read:
+
+```markdown
+Before making any code changes, read `secure-coding-baseline.md` in this repository and follow all rules defined there.
+```
+
+This is an instruction to read the file, not a native import—the assistant must choose to follow it. Claude Code's `@` syntax is the only real import among these tools.
 
 ### Keeping the copies in sync
 
@@ -175,7 +154,9 @@ Runs cost tokens and time; at affordable sample sizes the results show direction
 
 ## Background
 
-[Scheurer, Balesni, and Hobbhahn (2023)](https://arxiv.org/abs/2311.07590) show that instructions can reduce, but not eliminate, undesirable behavior in a pressured scenario. [Wallace et al. (2024)](https://arxiv.org/abs/2404.13208) describe how instruction-hierarchy training can improve robustness.
+Whether project instructions change what an assistant does is contested, and the evidence splits in a way worth knowing before relying on them. [Gloaguen et al. (2026)](https://arxiv.org/abs/2602.11988) evaluated repository context files on real tasks and found they do not make agents better at their work—but the same study found that explicit instructions in those files are followed. What does not pay off are the repository overviews most templates lead with. On security specifically, [Kharma et al. (2026)](https://arxiv.org/abs/2605.24298) found that security-aware prompting alone did not significantly reduce how many vulnerabilities a model produced, only which ones. So the realistic claim for a baseline like this is narrow: it changes what the assistant treats as required. It does not guarantee secure code.
+
+Where it earns its place is under pressure. In the AgentPressureBench study cited above, agents pushed to keep improving a score cut corners on every task, and the harder the push, the sooner they started. When the researchers added explicit rules against exactly that, the behavior nearly disappeared—from 100% down to 8.3%. Written rules clearly help; the remaining 8.3% is why this one is a guardrail and not a control. The same caution applies over time: [Shukla et al. (2025)](https://arxiv.org/abs/2506.11022) saw critical vulnerabilities climb after just five rounds of asking a model to improve its own code, and [Gamage (2026)](https://arxiv.org/abs/2604.20911) found that prohibitions lose their grip as a session grows long, while positively phrased requirements hold. Rules read once at the start are weakest late in a long session—which is part of why the baseline ends with a review-and-report step instead of trusting the rules alone. [Wallace et al. (2024)](https://arxiv.org/abs/2404.13208) point at the durable fix: instruction-hierarchy training, which works at the model level rather than the file level.
 
 ## License
 
