@@ -15,7 +15,7 @@ A short set of secure-coding rules for AI coding assistants. Add it to a project
 >
 > This baseline guides an LLM; it is not an enforceable control or a guarantee of secure code. Supplement it with project-specific instructions and independently validate changes through review, tests, dependency and secret scanning, SAST, and CI or pre-commit checks as appropriate.
 
-The baseline is deliberately compact: ~11.0 KB (roughly 2,900 model tokens), including one condensed rule for LLM-powered features. Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
+The baseline is deliberately compact: ~11.2 KB (roughly 2,950 model tokens), including one condensed rule for LLM-powered features. Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
 
 ## Why this exists
 
@@ -68,15 +68,6 @@ It may still open the file as ordinary content if a task leads it there—but th
   ```
 
 - **Organization:** deploy it as a managed-policy `CLAUDE.md`; managed settings or plugins can add enforceable controls. See the [Claude Code organization setup](https://code.claude.com/docs/en/admin-setup).
-
-#### Verify it loaded
-
-An instruction file that is never loaded fails silently—the assistant behaves as if the rules do not exist, and nothing reports the gap. Check before relying on it:
-
-- `/context` — the *Memory Files* table lists every loaded file with its token count.
-- `/memory` — lists loaded files, including resolved `@` imports.
-- `claude --debug` — logs instruction-file discovery and import resolution at startup.
-- After the fact: `grep -c "Non-negotiable" ~/.claude/projects/<project-slug>/<session-id>.jsonl`. A `0` means the baseline was never in context.
 
 ### GitHub Copilot
 
@@ -136,6 +127,19 @@ Before making any code changes, read `secure-coding-baseline.md` in this reposit
 ```
 
 This is an instruction to read the file, not a native import—the assistant must choose to follow it. Claude Code's `@` syntax is the only real import among these tools.
+
+### Verify it loaded
+
+An instruction file that is never loaded fails silently—the assistant behaves as if the rules do not exist, and nothing reports the gap. Check before relying on it.
+
+The baseline carries an id, `ascb-0.1`, and instructs the assistant to name it on request. Ask any tool `baseline?`: the id and the file it came from means the rules are in context, anything else means they are not. Two limits. An assistant that can see the file in the repository may read the id rather than recall it, so this confirms presence, not that a copy elsewhere in the chain loaded. And presence is not compliance—for that, see [Testing the baseline](#testing-the-baseline). Adapting the rules should change the id too, say to `ascb-0.1-acme`, so the answer names the adapted version instead of implying the published one.
+
+Claude Code can confirm loading directly, which the id cannot:
+
+- `/context` — the *Memory Files* table lists every loaded file with its token count.
+- `/memory` — lists loaded files, including resolved `@` imports.
+- `claude --debug` — logs instruction-file discovery and import resolution at startup.
+- After the fact: `grep -c "Non-negotiable" ~/.claude/projects/<project-slug>/<session-id>.jsonl`. A `0` means the baseline was never in context.
 
 ### Keeping the copies in sync
 

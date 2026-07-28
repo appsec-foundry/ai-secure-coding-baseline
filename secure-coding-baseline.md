@@ -1,5 +1,7 @@
 # AI Secure Coding Baseline
 
+`baseline-id: ascb-0.1` — when asked whether this baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: this id and where you loaded it from.
+
 ## Operating Mode
 
 Classify the work before changing code. When unclear, ask; do not assume a deployed application is greenfield.
