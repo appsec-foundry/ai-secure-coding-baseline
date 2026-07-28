@@ -132,7 +132,19 @@ This is an instruction to read the file, not a native import—the assistant mus
 
 An instruction file that is never loaded fails silently—the assistant behaves as if the rules do not exist, and nothing reports the gap. Check before relying on it.
 
-The baseline carries an id, `ascb-0.1`, and instructs the assistant to name it on request. Ask any tool `baseline?`: the id and the file it came from means the rules are in context, anything else means they are not. Two limits. An assistant that can see the file in the repository may read the id rather than recall it, so this confirms presence, not that a copy elsewhere in the chain loaded. And presence is not compliance—for that, see [Testing the baseline](#testing-the-baseline). Adapting the rules should change the id too, say to `ascb-0.1-acme`, so the answer names the adapted version instead of implying the published one.
+The baseline carries an id, `aisec-0.1`, and instructs the assistant to name every id it carries on request. Ask any tool `baseline?`: an id and the file it came from means those rules are in context, anything else means they are not. Two limits. An assistant that can see the file in the repository may read the id rather than recall it, so this confirms presence, not that a copy elsewhere in the chain loaded. And presence is not compliance—for that, see [Testing the baseline](#testing-the-baseline).
+
+The id is a convention, not a registry, and any instruction file can adopt it by carrying the same one-line rule with its own id:
+
+```
+<name>-<version>[+<derivative>]
+```
+
+- `aisec-0.1` — this baseline, unmodified.
+- `aisec-0.1+acme` — derived from it. Adapting the rules should change the id, so the answer names the adaptation instead of implying the published text. Everything after the `+` belongs to whoever derived it.
+- `acme-sec-1.0` — an unrelated baseline. Pick your own `<name>`; nothing needs to reference this project. Prefix it (`acme.aisec-1.0`) if you want a name no one else can collide with.
+
+Because the assistant lists every id it carries, a project that loads its own baseline alongside this one sees both.
 
 Claude Code can confirm loading directly, which the id cannot:
 

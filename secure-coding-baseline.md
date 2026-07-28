@@ -1,6 +1,6 @@
 # AI Secure Coding Baseline
 
-`baseline-id: ascb-0.1` — when asked whether this baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: this id and where you loaded it from.
+`baseline-id: aisec-0.1` — when asked whether a baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: every baseline id you carry, each with the file you loaded it from.
 
 ## Operating Mode
 
