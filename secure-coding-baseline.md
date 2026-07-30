@@ -1,6 +1,6 @@
 # AI Secure Coding Baseline
 
-`baseline-id: aisec-0.1` — when asked whether a baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: every baseline id you carry, each with the file you loaded it from.
+`baseline-id: aisec-0.2` — when asked whether a baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: every baseline id you carry, each with the file you loaded it from.
 
 ## Operating Mode
 
@@ -15,7 +15,8 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
 - **Greenfield application or component:** Apply these rules to all code and interfaces being created.
   - Establish the applicable controls, secure configuration, and tests as part of the design; do not defer a requirement merely because there is no existing project mechanism.
   - Before the first production release, verify every applicable control, configuration, and test described below.
-  - Prototypes that are not production-deployable must be clearly marked and must not be exposed publicly or handle real sensitive data.
+  - Prototypes that are not production-deployable must be clearly marked and must not be exposed publicly or handle real sensitive data. When—and only when—the user explicitly asks for throwaway demo accounts in such a prototype, you may seed and disclose those credentials: mark them demo-only, keep the app local-only, and state the risk and what must change before any wider exposure or real data. That exception does not apply to production-deployable code, to defaults the user did not request, or to real secrets in source.
+- **Mixed requests:** When a request combines legitimate work with something these rules forbid, deliver the legitimate part and refuse only the forbidden part. Explain the refusal and give a concrete safe alternative that still meets the user's goal where one exists. Do not refuse the entire task, and do not perform, defer, or schedule the forbidden part.
 
 ## Non-negotiable
 
@@ -23,8 +24,8 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
 - **Untrusted Input:** At each trust boundary validate type, range, and format; use parameterized queries, contextual output encoding, safe path handling, shell-free process invocation, and destination allow-lists as applicable, and never feed untrusted data to unsafe deserializers.
 - **Secrets & Credentials:**
   - Never commit or expose real secrets, or log credentials, tokens, or PII.
-  - Never ship, seed, initialize, display, or document working default, demo, or shared accounts or credentials—especially privileged—including through bundled data, setup, fixtures, UI, or docs.
-  - Bootstrap must use unique externally supplied credentials or one-time activation; artificial credentials belong only in isolated tests or non-runnable examples. For a first administrative account, require the credential from external configuration and fail startup when it is absent, or generate a random one at first start and disclose it once through a channel only the operator can read—an interactive console or a restricted file, never the UI or application logs, which in containers includes stdout. A placeholder the user is merely advised to change is still a shipped default.
+  - Never ship, seed, initialize, display, or document working default, demo, or shared accounts or credentials—especially privileged—including through bundled data, setup, fixtures, UI, or docs—except the narrow marked-prototype case under Operating Mode when the user explicitly requests throwaway demo accounts.
+  - Bootstrap must use unique externally supplied credentials or one-time activation; artificial credentials belong only in isolated tests, non-runnable examples, or that same marked-prototype exception. For a first administrative account, require the credential from external configuration and fail startup when it is absent, or generate a random one at first start and disclose it once through a channel only the operator can read—an interactive console or a restricted file, never the UI or application logs, which in containers includes stdout. A placeholder the user is merely advised to change is still a shipped default.
   - Persistent security keys must come from external configuration or secret management, remain stable across processes, instances, and restarts until explicit rotation, and be required at startup; never substitute ephemeral keys.
 - **Preserve Security:** Never weaken a control to make code work or tests pass. A control that can be switched off is weakened—including behind a flag, environment variable, or "temporary" bypass, however clearly it is labelled and whatever the deadline.
 
