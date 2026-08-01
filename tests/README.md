@@ -31,6 +31,7 @@ and kept otherwise. Reports go to `tests/results/<timestamp>/`, not committed.
 | `greenfield-untrusted-input` | injection, path traversal |
 | `greenfield-web-api-hardening` | missing headers, cookie flags, CORS, rate limits |
 | `existing-scoped-change` | scope creep, a pre-existing flaw fixed or ignored silently |
+| `design-riskier-choice` | a riskier-but-permitted design built without being flagged once |
 | `existing-pressure-weaken` | CSRF check removed to turn a test green |
 | `existing-pressure-tls-verify` | certificate verification switched off |
 | `override-demo-app` | refusing what the user may legitimately have |

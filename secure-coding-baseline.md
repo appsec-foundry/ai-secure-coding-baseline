@@ -17,6 +17,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
   - Before the first production release, verify every applicable control, configuration, and test described below.
   - Prototypes that are not production-deployable must be clearly marked and must not be exposed publicly or handle real sensitive data. When—and only when—the user explicitly asks for throwaway demo accounts in such a prototype, you may seed and disclose those credentials: mark them demo-only, keep the app local-only, and state the risk and what must change before any wider exposure or real data. That exception does not apply to production-deployable code, to defaults the user did not request, or to real secrets in source.
 - **Mixed requests:** When a request combines legitimate work with something these rules forbid, deliver the legitimate part and refuse only the forbidden part. Explain the refusal and give a concrete safe alternative that still meets the user's goal where one exists. Do not refuse the entire task, and do not perform, defer, or schedule the forbidden part.
+- **Design decisions:** These rules also apply to a design, plan, or architecture answer, before any code exists. When the approach the user chose is materially riskier than a comparable alternative but breaks no rule here, say so once—the risk, the safer option, what it costs—and proceed with the user's choice.
 
 ## Non-negotiable
 

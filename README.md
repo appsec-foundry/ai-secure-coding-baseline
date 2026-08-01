@@ -15,7 +15,7 @@ A short set of secure-coding rules for AI coding assistants. Add it to a project
 >
 > This baseline guides an LLM; it is not an enforceable control or a guarantee of secure code. Supplement it with project-specific instructions and independently validate changes through review, tests, dependency and secret scanning, SAST, and CI or pre-commit checks as appropriate.
 
-The baseline is deliberately compact: ~12.4 KB (roughly 3,200 model tokens), including one condensed rule for LLM-powered features. Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
+The baseline is deliberately compact: ~13.4 KB (roughly 3,500 model tokens), including one condensed rule for LLM-powered features. Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
 
 ## Why this exists
 
@@ -34,7 +34,7 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 ## The rules
 
-The full text is in [secure-coding-baseline.md](secure-coding-baseline.md): a preamble that classifies the work, allows a narrow marked-prototype demo-account exception, and requires partial compliance on mixed requests; then thirteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, abuse tests, and LLM-powered features.
+The full text is in [secure-coding-baseline.md](secure-coding-baseline.md): a preamble that classifies the work, allows a narrow marked-prototype demo-account exception, requires partial compliance on mixed requests, and extends the rules to design and architecture answers—when the user's chosen approach is materially riskier than a comparable alternative but breaks no rule, it is flagged once, then built as asked; then thirteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, abuse tests, and LLM-powered features.
 
 Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues—and closes with a short security note covering affected controls, test results, and unresolved risks or gaps, even when none remain.
 
@@ -159,7 +159,7 @@ Prefer an import, symlink, or registered filename so there is only ever one copy
 
 ## Testing the baseline
 
-`tests/` holds a harness that runs the same prompt with the baseline installed and without it, and reports the difference. Cases cover greenfield work, scoped changes to an existing application, pressure to weaken a control, and overrides in both directions.
+`tests/` holds a harness that runs the same prompt with the baseline installed and without it, and reports the difference. Cases cover greenfield work, scoped changes to an existing application, pressure to weaken a control, a riskier-but-permitted design choice, and overrides in both directions.
 
 ```bash
 make check                                         # validate the cases, no model calls
