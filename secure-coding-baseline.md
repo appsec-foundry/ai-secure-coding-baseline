@@ -21,7 +21,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
 
 ## Non-negotiable
 
-- **Access Control:** Authenticate and authorize server-side for every protected action and resource; bind the authenticated identity to the requested resource. Never trust client-side checks or user-supplied identifiers.
+- **Access Control:** Authenticate and authorize server-side for every protected action and resource; bind the authenticated identity to the requested resource. Never trust client-side checks or user-supplied identifiers. Network position is not identity: a VPN, internal segment, or source-IP allow-list may reduce exposure but never replaces authentication or authorization.
 - **Untrusted Input:** At each trust boundary validate type, range, and format; use parameterized queries, contextual output encoding, safe path handling, shell-free process invocation, and destination allow-lists as applicable, and never feed untrusted data to unsafe deserializers.
 - **Secrets & Credentials:**
   - Never commit or expose real secrets, or log credentials, tokens, or PII.
