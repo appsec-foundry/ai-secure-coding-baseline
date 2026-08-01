@@ -36,7 +36,7 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 The full text is in [secure-coding-baseline.md](secure-coding-baseline.md): a preamble that classifies the work, allows a narrow marked-prototype demo-account exception, requires partial compliance on mixed requests, and extends the rules to design and architecture answers—when the user's chosen approach is materially riskier than a comparable alternative but breaks no rule, it is flagged once, then built as asked; then thirteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, abuse tests, and LLM-powered features.
 
-Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues—and closes with a short security note covering affected controls, test results, and unresolved risks or gaps, even when none remain.
+Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues—and closes with a security note in three named parts: what it implemented, what it left out, and what remains unverified. Each part appears even when its answer is none, and the note may not claim the code runs without having run it.
 
 ## Using it
 
@@ -132,7 +132,7 @@ This is an instruction to read the file, not a native import—the assistant mus
 
 An instruction file that is never loaded fails silently—the assistant behaves as if the rules do not exist, and nothing reports the gap. Check before relying on it.
 
-The baseline carries an id, `aisec-0.2`, and instructs the assistant to name every id it carries on request. Ask any tool `baseline?`: an id and the file it came from means those rules are in context, anything else means they are not. Two limits. An assistant that can see the file in the repository may read the id rather than recall it, so this confirms presence, not that a copy elsewhere in the chain loaded. And presence is not compliance—for that, see [Testing the baseline](#testing-the-baseline).
+The baseline carries an id, `aisec-0.3`, and instructs the assistant to name every id it carries on request. Ask any tool `baseline?`: an id and the file it came from means those rules are in context, anything else means they are not. Two limits. An assistant that can see the file in the repository may read the id rather than recall it, so this confirms presence, not that a copy elsewhere in the chain loaded. And presence is not compliance—for that, see [Testing the baseline](#testing-the-baseline).
 
 The id is a convention, not a registry, and any instruction file can adopt it by carrying the same one-line rule with its own id:
 
@@ -140,8 +140,8 @@ The id is a convention, not a registry, and any instruction file can adopt it by
 <name>-<version>[+<derivative>]
 ```
 
-- `aisec-0.2` — this baseline, unmodified.
-- `aisec-0.2+acme` — derived from it. Adapting the rules should change the id, so the answer names the adaptation instead of implying the published text. Everything after the `+` belongs to whoever derived it.
+- `aisec-0.3` — this baseline, unmodified.
+- `aisec-0.3+acme` — derived from it. Adapting the rules should change the id, so the answer names the adaptation instead of implying the published text. Everything after the `+` belongs to whoever derived it.
 - `acme-sec-1.0` — an unrelated baseline. Pick your own `<name>`; nothing needs to reference this project. Prefix it (`acme.aisec-1.0`) if you want a name no one else can collide with.
 
 Because the assistant lists every id it carries, a project that loads its own baseline alongside this one sees both.
