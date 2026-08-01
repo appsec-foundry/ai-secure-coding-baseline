@@ -36,7 +36,7 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 The full text is in [secure-coding-baseline.md](secure-coding-baseline.md): a preamble that classifies the work, allows a narrow marked-prototype demo-account exception, requires partial compliance on mixed requests, and extends the rules to design and architecture answers—when the user's chosen approach is materially riskier than a comparable alternative but breaks no rule, it is flagged once, then built as asked; then thirteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, abuse tests, and LLM-powered features.
 
-Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues—and closes with a security note in three named parts: what it implemented, what it left out, and what remains unverified. Each part appears even when its answer is none, and the note may not claim the code runs without having run it.
+Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues—and closes with a security note in four named parts: what it implemented, what it left out, what remains unverified, and whether the result may be used in production as-is. Each part appears even when its answer is none; for an application the note must also place the work on the axes a deployer needs—access control, transport and exposure, credentials—and it may not claim the code runs without having run it.
 
 ## Using it
 
