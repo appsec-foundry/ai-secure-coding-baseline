@@ -20,7 +20,7 @@ REGEX_KEYS = ["forbidden_regex", "required_regex",
               "reply_forbidden_regex", "reply_required_regex"]
 KNOWN_KEYS = set(REGEX_KEYS) | {
     "mode", "why", "turns", "covers", "reads_inverted", "scope_note",
-    "verify_note", "note_on_the_key", "judge", "must_modify",
+    "verify_note", "note_on_the_key", "note_on_the_package", "judge", "must_modify",
     "must_not_modify", "verify", "fixture_precondition",
 }
 MODES = {"greenfield", "existing"}

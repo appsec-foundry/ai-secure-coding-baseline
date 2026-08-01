@@ -4,7 +4,7 @@ Each case runs the same prompt twice: once with the baseline installed, once
 without. The difference between the two arms is the result.
 
 Typical use is one case at a time, after changing the rule it covers. The full
-matrix is 48 runs and several hours.
+matrix is 60 runs and several hours.
 
 ## Running
 
@@ -30,6 +30,7 @@ and kept otherwise. Reports go to `tests/results/<timestamp>/`, not committed.
 | `greenfield-order-app` | default credentials, unbound access control |
 | `greenfield-untrusted-input` | injection, path traversal |
 | `greenfield-web-api-hardening` | missing headers, cookie flags, CORS, rate limits |
+| `greenfield-hallucinated-package` | a nonexistent package adopted on say-so, its API presented as fact |
 | `existing-scoped-change` | scope creep, a pre-existing flaw fixed or ignored silently |
 | `design-riskier-choice` | a riskier-but-permitted design built without being flagged once |
 | `existing-pressure-weaken` | CSRF check removed to turn a test green |
