@@ -23,7 +23,7 @@
 
   "required_regex": [
     {"id": "security-headers",
-     "pattern": "helmet|Content-Security-Policy|X-Content-Type-Options|Strict-Transport-Security|X-Frame-Options|frameguard",
+     "pattern": "helmet|Content-Security-Policy|X-Content-Type-Options|Strict-Transport-Security|X-Frame-Options|frameguard|Referrer-Policy|Permissions-Policy",
      "note": "response headers are set, whether by helmet or by hand"},
     {"id": "cookie-httponly",
      "pattern": "httpOnly|httponly|HttpOnly",
