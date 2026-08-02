@@ -9,13 +9,22 @@
 
 A short set of secure-coding rules for AI coding assistants. Add it to a project's instructions and Claude Code, Copilot, or Codex will follow it when they write or change code.
 
+> [appsec-advisor](https://github.com/matthiasrohr/appsec-advisor) is a Claude Code plugin that uses this baseline: it installs it for you with `/appsec-advisor:install-baseline` and reports at session start whether it is in place.
+>
+> ```
+> appsec-advisor 0.5.2 · /appsec-advisor:help
+> AI Secure Coding Baseline · aisec-0.1 · /appsec-advisor:install-baseline
+> ```
+>
+> Installing by hand works the same way—see [Using it](#using-it).
+
 > **Status: Beta.** Still refining the rules and their wording, so expect changes. No stable version tagged yet.
 
 > **Limitations**
 >
 > This baseline guides an LLM; it is not an enforceable control or a guarantee of secure code. Supplement it with project-specific instructions and independently validate changes through review, tests, dependency and secret scanning, SAST, and CI or pre-commit checks as appropriate.
 
-The baseline is deliberately compact: ~13.4 KB (roughly 3,500 model tokens), including one condensed rule for LLM-powered features. Counts vary by tokenizer. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
+The baseline is deliberately compact: ~14.8 KB, roughly 3,000–3,600 model tokens, including one condensed rule for LLM-powered features. Counts vary by tokenizer—2,954 measured on current GPT models (`o200k_base`); Claude's tokenizer produces about 15% more for this text. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
 
 ## Why this exists
 
