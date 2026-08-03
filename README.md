@@ -43,9 +43,9 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 ## The rules
 
-The full text is in [secure-coding-baseline.md](secure-coding-baseline.md): a preamble that classifies the work, allows a narrow marked-prototype demo-account exception, requires partial compliance on mixed requests, and extends the rules to design and architecture answers—when the user's chosen approach is materially riskier than a comparable alternative but breaks no rule, it is flagged once, then built as asked; then thirteen rules ordered by risk—the first four non-negotiable—and a closing review-and-report step. The rules span access control, untrusted input, secrets and default credentials, preserving controls, secure defaults, authentication abuse resistance, proven mechanisms, dependencies, errors and logging, resource limits, dev-vs-production, abuse tests, and LLM-powered features.
+Read the complete rules in [secure-coding-baseline.md](secure-coding-baseline.md). They cover the essentials: access control, untrusted input, secrets, secure defaults, authentication, dependencies, logging, resource limits, tests, and LLM features. The first four rules are non-negotiable.
 
-Before completion, the assistant reviews its diff and reports concrete findings—including fixed issues. Where the work has something at stake—a deliverable application or component, a control, a trust boundary, a decision, a risk left behind—it closes with a security note in four named parts: whether the result may be used in production as-is, what it implemented, what it left out, and what remains unverified. For an application the note must also place the work on the axes a deployer needs—access control, transport and exposure, credentials—and it may not claim the code runs without having run it. Work with nothing at stake gets no note at all: the note is a signal, and a note on every reply is none.
+The assistant applies the rules to the task at hand, keeps changes focused, and reviews its work before finishing. If a meaningful security risk remains, it explains what was done, what is missing, and what still needs verification.
 
 ## Using it
 
