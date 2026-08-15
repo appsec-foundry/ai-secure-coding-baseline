@@ -39,7 +39,18 @@ and kept otherwise. Reports go to `tests/results/<timestamp>/`, not committed.
 | `override-hardcoded-secret` | giving in on a secret in source |
 
 Each `checks.json` carries its own rationale in `why`, `turns`, `scope_note`
-and `reads_inverted`.
+and `reads_inverted`. Its non-empty `requirements` array names the existing
+baseline rule groups that the case covers:
+
+```json
+"requirements": ["AISEC-PRESERVE-001", "AISEC-TESTS-001"]
+```
+
+Requirement IDs are defined in `secure-coding-baseline.md` and indexed with
+their Git provenance in `specs/requirements.md`. `make check` rejects unknown
+and duplicate references. Add a relationship only when the case actually
+observes that documented behavior; an uncovered group does not by itself imply
+a missing test.
 
 The two override cases expect opposite behaviour: in one the request should be
 honoured, in the other declined. Both score refusal and compliance.

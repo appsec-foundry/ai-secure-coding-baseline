@@ -15,11 +15,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CASES = HERE / "cases"
 BASELINE = HERE.parent / "secure-coding-baseline.md"
+REQUIREMENT_ID = re.compile(r"AISEC-[A-Z][A-Z0-9]*-\d{3}")
 
 REGEX_KEYS = ["forbidden_regex", "required_regex",
               "reply_forbidden_regex", "reply_required_regex"]
 KNOWN_KEYS = set(REGEX_KEYS) | {
-    "mode", "why", "turns", "covers", "reads_inverted", "scope_note",
+    "mode", "why", "turns", "requirements", "reads_inverted", "scope_note",
     "verify_note", "note_on_the_key", "note_on_the_package", "judge", "must_modify",
     "must_not_modify", "verify", "fixture_precondition",
 }
@@ -34,7 +35,27 @@ def fail(case: str, msg: str) -> None:
     problems.append(f"{case}: {msg}")
 
 
-def check_case(d: Path) -> None:
+def load_baseline_requirement_ids() -> set[str]:
+    if not BASELINE.is_file():
+        problems.append(f"baseline missing at {BASELINE}")
+        return set()
+
+    text = BASELINE.read_text(encoding="utf-8")
+    raw_ids = re.findall(r"\[(AISEC-[^\]]+)\]", text)
+    ids: set[str] = set()
+    for requirement_id in raw_ids:
+        if not REQUIREMENT_ID.fullmatch(requirement_id):
+            problems.append(f"baseline has malformed requirement id {requirement_id!r}")
+        elif requirement_id in ids:
+            problems.append(f"baseline has duplicate requirement id {requirement_id!r}")
+        else:
+            ids.add(requirement_id)
+    if not ids:
+        problems.append("baseline has no requirement ids")
+    return ids
+
+
+def check_case(d: Path, baseline_ids: set[str]) -> None:
     name = d.name
 
     for required in ("prompt.md", "checks.json"):
@@ -66,6 +87,21 @@ def check_case(d: Path) -> None:
 
     if checks.get("mode") not in MODES:
         fail(name, f"mode must be one of {sorted(MODES)}")
+
+    requirements = checks.get("requirements")
+    if not isinstance(requirements, list) or not requirements:
+        fail(name, "requirements must be a non-empty list")
+    else:
+        seen_requirements: set[str] = set()
+        for requirement_id in requirements:
+            if not isinstance(requirement_id, str):
+                fail(name, "requirements contains a non-string id")
+            elif requirement_id in seen_requirements:
+                fail(name, f"duplicate requirement id {requirement_id!r}")
+            elif requirement_id not in baseline_ids:
+                fail(name, f"unknown requirement id {requirement_id!r}")
+            else:
+                seen_requirements.add(requirement_id)
 
     ids: set[str] = set()
     for key in REGEX_KEYS:
@@ -132,8 +168,7 @@ def run_fixture_precondition(name: str, d: Path, checks: dict) -> None:
 
 
 def main() -> int:
-    if not BASELINE.is_file():
-        problems.append(f"baseline missing at {BASELINE}")
+    baseline_ids = load_baseline_requirement_ids()
 
     try:
         subprocess.run([sys.executable, "-m", "py_compile", str(HERE / "run.py")],
@@ -145,7 +180,7 @@ def main() -> int:
     if not dirs:
         problems.append("no cases found")
     for d in dirs:
-        check_case(d)
+        check_case(d, baseline_ids)
 
     for n in notes:
         print(f"note: {n}")

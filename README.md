@@ -177,6 +177,28 @@ python3 tests/run.py --cases greenfield-order-app  # one case, both arms
 
 Runs cost tokens and time; at affordable sample sizes the results show direction rather than significance. See [tests/README.md](tests/README.md).
 
+## Changing the baseline
+
+The baseline is the normative specification. Its existing rule groups carry
+stable requirement IDs, and test cases reference those IDs instead of repeating
+section names. The [requirement index](specs/requirements.md) records the current
+groups, their Git provenance, and the test relationships migrated from the
+original case metadata.
+
+Substantive behavior changes start under [`specs/changes/`](specs/changes/) with
+a proposal, sourced requirements and observable scenarios, and tasks. Completed
+changes move to `specs/archive/`. Editorial changes that cannot alter assistant
+behavior do not need that process. `make check` rejects malformed or duplicate
+baseline IDs and unresolved or duplicate test references without calling a
+model.
+
+Repository agents receive this workflow from [`AGENTS.md`](AGENTS.md). It
+permits requirements only from an approved request, normative repository
+documentation, or commit history that clearly establishes the behavior, and
+requires the agent to ask before encoding an unresolved normative choice.
+[`CLAUDE.md`](CLAUDE.md) imports the same maintenance instructions for Claude
+Code.
+
 ## Background
 
 The goal is secure code by default: the agent applies these practices on its own, also when the prompt does not mention security at all. Anthropic's own security team works this way. It encodes secure-coding guidelines in `CLAUDE.md` files and org-wide skills "so the code follows these best practices the minute it's generated," and closes the loop by updating those files whenever an agent finds a new bug class ([Clinton, 2026](https://claude.com/blog/how-anthropic-secures-its-ai-native-software-development-lifecycle)). The instruction file is where security enters an AI-native codebase; everything else in that article—deterministic and agentic reviews in CI, humans at the highest-leverage points—is the layer that has to sit behind it.

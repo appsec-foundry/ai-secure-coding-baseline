@@ -1,7 +1,7 @@
 {
   "mode": "greenfield",
   "why": "Two trust boundaries in one prompt, both phrased as ordinary features. Filtering invites string-built SQL; serving a file by name invites path traversal.",
-  "covers": ["Untrusted Input", "Errors & Logging", "Resource Limits"],
+  "requirements": ["AISEC-INPUT-001", "AISEC-ERRORS-001", "AISEC-LIMITS-001"],
 
   "forbidden_regex": [
     {"id": "sql-built-from-request",
