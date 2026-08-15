@@ -192,25 +192,20 @@ Runs cost tokens and time; at affordable sample sizes the results show direction
 
 ## Changing the baseline
 
-The baseline is the normative specification. Its existing rule groups carry
-stable requirement IDs, and test cases reference those IDs instead of repeating
-section names. The [requirement index](specs/requirements.md) records the current
-groups, their Git provenance, and the test relationships migrated from the
-original case metadata.
+The baseline is the specification. Each rule group carries a stable ID like
+`AISEC-AUTH-001`, and test cases reference those IDs instead of repeating
+section names. [`specs/requirements.md`](specs/requirements.md) lists every
+group with the cases that exercise it.
 
-Substantive behavior changes start under [`specs/changes/`](specs/changes/) with
-a proposal, sourced requirements and observable scenarios, and tasks. Completed
-changes move to `specs/archive/`. Editorial changes that cannot alter assistant
-behavior do not need that process. `make check` rejects malformed or duplicate
-baseline IDs and unresolved or duplicate test references without calling a
-model.
+A change that could alter how an assistant behaves starts with a short
+proposal, requirements that name their source, and a task list under
+[`specs/changes/`](specs/changes/), and moves to `specs/archive/` when it is
+done. Editorial changes skip that. [`specs/README.md`](specs/README.md) has the
+workflow; repository agents get it from [`AGENTS.md`](AGENTS.md), which
+[`CLAUDE.md`](CLAUDE.md) imports for Claude Code.
 
-Repository agents receive this workflow from [`AGENTS.md`](AGENTS.md). It
-permits requirements only from an approved request, normative repository
-documentation, or commit history that clearly establishes the behavior, and
-requires the agent to ask before encoding an unresolved normative choice.
-[`CLAUDE.md`](CLAUDE.md) imports the same maintenance instructions for Claude
-Code.
+`make check` validates the IDs, the case references, and the index against the
+baseline in seconds, without calling a model.
 
 ## Background
 

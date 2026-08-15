@@ -1,0 +1,15 @@
+name: check
+
+# The suite check is free and takes under a second, so it runs on everything.
+# Model runs cost money and are never started from here.
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make check

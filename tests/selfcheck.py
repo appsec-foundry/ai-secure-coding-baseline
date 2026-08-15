@@ -15,7 +15,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CASES = HERE / "cases"
 BASELINE = HERE.parent / "secure-coding-baseline.md"
+INDEX = HERE.parent / "specs" / "requirements.md"
+CHANGES = HERE.parent / "specs" / "changes"
+ARCHIVE = HERE.parent / "specs" / "archive"
+CHANGE_FILES = ("proposal.md", "requirements.md", "tasks.md")
 REQUIREMENT_ID = re.compile(r"AISEC-[A-Z][A-Z0-9]*-\d{3}")
+GROUP_BULLET = re.compile(r"- \*\*\[(AISEC-[^\]]+)\] (.+?):?\*\*")
+INDEX_ROW = re.compile(r"\|\s*`(AISEC-[^`]+)`\s*\|(.+?)\|(.+?)\|(.+?)\|\s*$")
 
 REGEX_KEYS = ["forbidden_regex", "required_regex",
               "reply_forbidden_regex", "reply_required_regex"]
@@ -29,30 +35,85 @@ TARGETS = {"code", "reply"}
 
 problems: list[str] = []
 notes: list[str] = []
+coverage: dict[str, list[str]] = {}
 
 
 def fail(case: str, msg: str) -> None:
     problems.append(f"{case}: {msg}")
 
 
-def load_baseline_requirement_ids() -> set[str]:
+def load_baseline_groups() -> dict[str, tuple[str, str]]:
+    """Map each requirement id to its group name and the section it sits in."""
     if not BASELINE.is_file():
         problems.append(f"baseline missing at {BASELINE}")
-        return set()
+        return {}
 
-    text = BASELINE.read_text(encoding="utf-8")
-    raw_ids = re.findall(r"\[(AISEC-[^\]]+)\]", text)
-    ids: set[str] = set()
-    for requirement_id in raw_ids:
-        if not REQUIREMENT_ID.fullmatch(requirement_id):
-            problems.append(f"baseline has malformed requirement id {requirement_id!r}")
-        elif requirement_id in ids:
-            problems.append(f"baseline has duplicate requirement id {requirement_id!r}")
-        else:
-            ids.add(requirement_id)
-    if not ids:
+    groups: dict[str, tuple[str, str]] = {}
+    section = ""
+    for line in BASELINE.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            section = line[3:].strip()
+        bullet = GROUP_BULLET.match(line.strip())
+        for requirement_id in re.findall(r"\[(AISEC-[^\]]+)\]", line):
+            if not REQUIREMENT_ID.fullmatch(requirement_id):
+                problems.append(f"baseline has malformed requirement id {requirement_id!r}")
+            elif requirement_id in groups:
+                problems.append(f"baseline has duplicate requirement id {requirement_id!r}")
+            elif not bullet or bullet.group(1) != requirement_id:
+                problems.append(f"baseline id {requirement_id!r} is not on a rule-group bullet")
+            else:
+                groups[requirement_id] = (bullet.group(2).strip(), section)
+    if not groups:
         problems.append("baseline has no requirement ids")
-    return ids
+    return groups
+
+
+def check_requirement_index(groups: dict[str, tuple[str, str]]) -> None:
+    """The index in specs/ is documentation, so only a check keeps it true."""
+    if not INDEX.is_file():
+        problems.append(f"requirement index missing at {INDEX}")
+        return
+
+    listed: set[str] = set()
+    for line in INDEX.read_text(encoding="utf-8").splitlines():
+        row = INDEX_ROW.match(line.strip())
+        if not row:
+            continue
+        requirement_id, name, section, cases = (c.strip() for c in row.groups())
+        if requirement_id in listed:
+            problems.append(f"index lists {requirement_id!r} twice")
+            continue
+        listed.add(requirement_id)
+        if requirement_id not in groups:
+            problems.append(f"index lists {requirement_id!r}, which the baseline does not define")
+            continue
+        expected_name, expected_section = groups[requirement_id]
+        if name != expected_name:
+            problems.append(f"index calls {requirement_id} {name!r}, baseline calls it {expected_name!r}")
+        if section != expected_section:
+            problems.append(f"index puts {requirement_id} in {section!r}, baseline has it in {expected_section!r}")
+        expected_cases = sorted(coverage.get(requirement_id, []))
+        if sorted(re.findall(r"`([^`]+)`", cases)) != expected_cases:
+            problems.append(f"index coverage for {requirement_id} is not what the cases declare: "
+                            f"expected {expected_cases or 'none'}")
+
+    for requirement_id in sorted(set(groups) - listed):
+        problems.append(f"index does not list {requirement_id!r}")
+
+
+def check_change_directories() -> None:
+    """A change directory that is missing a file is a change nobody can follow."""
+    for parent in (CHANGES, ARCHIVE):
+        if not parent.is_dir():
+            continue
+        for d in sorted(p for p in parent.iterdir()
+                        if p.is_dir() and not p.name.startswith(".")):
+            where = f"{parent.name}/{d.name}"
+            for name in CHANGE_FILES:
+                if not (d / name).is_file():
+                    problems.append(f"{where} is missing {name}")
+            if parent is ARCHIVE and not re.match(r"\d{4}-\d{2}-\d{2}-", d.name):
+                problems.append(f"{where} should start with a date: <date>-<short-name>")
 
 
 def check_case(d: Path, baseline_ids: set[str]) -> None:
@@ -102,6 +163,7 @@ def check_case(d: Path, baseline_ids: set[str]) -> None:
                 fail(name, f"unknown requirement id {requirement_id!r}")
             else:
                 seen_requirements.add(requirement_id)
+                coverage.setdefault(requirement_id, []).append(name)
 
     ids: set[str] = set()
     for key in REGEX_KEYS:
@@ -168,7 +230,8 @@ def run_fixture_precondition(name: str, d: Path, checks: dict) -> None:
 
 
 def main() -> int:
-    baseline_ids = load_baseline_requirement_ids()
+    groups = load_baseline_groups()
+    baseline_ids = set(groups)
 
     try:
         subprocess.run([sys.executable, "-m", "py_compile", str(HERE / "run.py")],
@@ -181,6 +244,8 @@ def main() -> int:
         problems.append("no cases found")
     for d in dirs:
         check_case(d, baseline_ids)
+    check_requirement_index(groups)
+    check_change_directories()
 
     for n in notes:
         print(f"note: {n}")

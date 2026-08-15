@@ -1,68 +1,72 @@
-# Specification-driven changes
+# How the baseline changes
 
-`secure-coding-baseline.md` is the normative product specification and remains
-the single file distributed to coding assistants. The files here index the
-requirements already present in that document and describe changes to them;
-they do not add or duplicate rule text.
+`secure-coding-baseline.md` in the repository root is the product — one file,
+shipped to coding assistants as it is. Nothing under `specs/` is normative for
+an assistant; it only records what the baseline contains and how it changes.
+
+- `requirements.md` — the rule groups that exist today and the cases covering them.
+- `changes/<name>/` — a change being worked on.
+- `archive/<date>-<name>/` — a change that is finished.
+
+## Where requirements come from
+
+Three sources, and no fourth: what the user asked for, what this repository
+already documents, or a commit that clearly established the behavior. Name the
+source for each requirement.
+
+If none of them settles a question, ask. Do not fill the gap with a rule, an
+exception, a test obligation, or a scope extension of your own. An example may
+make a sourced rule easier to see; it must not add to it.
+
+## When a change needs its own directory
+
+Whenever it could change how an assistant behaves. Typos, rewrapping, and edits
+to files like this one do not. If you cannot tell whether new wording changes
+behavior, assume it does.
+
+A change directory holds three short files — templates in `changes/README.md`:
+
+- `proposal.md` — problem, goal, non-goals, what it breaks.
+- `requirements.md` — what the baseline must do, with a source per requirement.
+- `tasks.md` — the work, ticked off as it happens.
+
+## Running a change
+
+1. Write the three files.
+2. Change the baseline, the test cases, and the documentation.
+3. Run `make check`.
+4. Run the model cases the change affects, or note in `tasks.md` why you did
+   not. They are evidence, not a gate: they cost money and vary between runs.
+5. Move the directory to `archive/<date>-<short-name>/`.
 
 ## Requirement IDs
 
-Each top-level behavior group in the baseline has a stable ID of the form
-`AISEC-<AREA>-<NNN>`. An ID identifies behavior, not a heading or line number,
-and remains unchanged when wording or document structure changes without
-changing that behavior. Split behavior gets a new ID; removed behavior retires
-its ID, which is never reused.
+Every rule group in the baseline carries an ID like `AISEC-AUTH-001`. The ID
+belongs to the behavior, not to the heading or the line: reword the rule and it
+keeps its ID. Split a group and the new half gets a new ID. Remove a group and
+its ID retires — never reuse it.
 
-Test cases declare the IDs they already covered under the former free-form
-`covers` field in the `requirements` array in their `checks.json`. `make check`
-validates that every ID is unique and every test reference resolves. It does
-not infer that every requirement needs a model test or that an unreferenced
-requirement is exempt; either decision requires an explicit, sourced change.
+Test cases name the IDs they exercise in their `checks.json`. A rule group
+without a case is not automatically a gap, and not automatically fine. Add a
+case relationship only when the case really observes that behavior.
 
-`requirements.md` is the traceability index. Its names come from the current
-baseline, its test relationships come from the existing case metadata, and its
-commit provenance comes from Git history. The normative wording remains in the
-baseline alone.
+## What is enforced
 
-The root `AGENTS.md` makes this workflow mandatory for repository agents and
-sets the boundary against unsourced normative decisions. `CLAUDE.md` imports
-the same instructions for Claude Code. Keep the process detail here and only
-the repository-wide working agreement in the agent files.
+`make check` runs on every push and pull request
+(`.github/workflows/check.yml`), takes about a second, and never calls a model.
+It fails on:
 
-## Change workflow
+- an ID that is duplicated, malformed, or not attached to a rule group;
+- a case naming an ID the baseline does not define;
+- a row in `requirements.md` that no longer matches the baseline or the cases;
+- a change directory missing one of its three files, or an archived one whose
+  name does not start with a date;
+- a case with an unknown key, a pattern that does not compile, or no checks;
+- a fixture that no longer starts in the state its case depends on.
 
-A substantive behavior change starts in `changes/<short-name>/` with three
-files:
+`tests/test_selfcheck.py` breaks a throwaway repository in each of those ways
+and expects the complaint, so the check itself cannot rot unnoticed.
 
-- `proposal.md`: the problem, goal, non-goals, and compatibility impact;
-- `requirements.md`: sourced normative deltas and Given/When/Then scenarios;
-- `tasks.md`: implementation and verification work.
-
-Requirements come from the approved request, existing documentation, or commit
-history, and name their source. If those sources do not settle a behavior, ask
-before recording it as a requirement. The change is ready to implement when
-its sourced requirements make the intended behavior and observable acceptance
-criteria unambiguous. Implementation updates the baseline, requirement index,
-test cases, and user documentation as applicable. Once all tasks are complete,
-move the directory to `archive/<date>-<short-name>/`.
-
-Small editorial changes that cannot alter assistant behavior do not require a
-change specification. If wording could reasonably change behavior, treat it as
-substantive.
-
-## Definition of done
-
-For a substantive change:
-
-1. The problem, goal, and non-goals are documented.
-2. Normative requirements name their source; positive or negative scenarios
-   express only behavior supported by that source.
-3. The compact baseline is updated without duplicating or inventing rule text.
-4. Affected model cases reference stable requirement IDs.
-5. `make check` passes.
-6. Existing relevant A/B model tests are run, or their deferral and reason are
-   recorded. A new test obligation is added only when its source is documented.
-7. The completed change specification is archived.
-
-Model runs remain evidence, not a deterministic CI gate: they cost tokens, take
-time, and are stochastic.
+Nothing here can tell whether a requirement really came from the source it
+names, or whether the rule is any good. That needs a reader. Whether an
+assistant actually follows it needs a model run.

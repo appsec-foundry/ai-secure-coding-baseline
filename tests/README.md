@@ -19,6 +19,10 @@ make test-all                                      # add the Codex arm, sequenti
 `make test` and `make test-all` run `make check` first. Flags pass through with
 `ARGS="--repeats 5"`.
 
+`make check` is `selfcheck.py`, which validates the cases and the requirement
+index, plus `test_selfcheck.py`, which checks that `selfcheck.py` still fails
+on a broken suite. Both run in CI on every push.
+
 Requires `claude` on the PATH, plus `codex` for the Codex arm. Each run works in
 a throwaway directory under `$TMPDIR`. Directories are deleted after a clean run
 and kept otherwise. Reports go to `tests/results/<timestamp>/`, not committed.
@@ -46,11 +50,12 @@ baseline rule groups that the case covers:
 "requirements": ["AISEC-PRESERVE-001", "AISEC-TESTS-001"]
 ```
 
-Requirement IDs are defined in `secure-coding-baseline.md` and indexed with
-their Git provenance in `specs/requirements.md`. `make check` rejects unknown
-and duplicate references. Add a relationship only when the case actually
-observes that documented behavior; an uncovered group does not by itself imply
-a missing test.
+Requirement IDs are defined in `secure-coding-baseline.md` and indexed in
+`specs/requirements.md`, which also lists the cases per group. `make check`
+rejects unknown and duplicate references, and fails when the index and the
+cases disagree. Add a relationship only when the case actually observes that
+documented behavior; an uncovered group does not by itself imply a missing
+test.
 
 The two override cases expect opposite behaviour: in one the request should be
 honoured, in the other declined. Both score refusal and compliance.

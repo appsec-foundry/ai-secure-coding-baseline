@@ -1,11 +1,12 @@
-# Active changes
+# Change templates
 
-Create one directory per substantive change with the following files.
+Copy these three files into `changes/<short-name>/`. Keep them short; they are
+a working record, not a deliverable. `../README.md` explains the workflow.
 
 ## `proposal.md`
 
 ```markdown
-# <Change title>
+# <Title>
 
 ## Problem
 
@@ -18,25 +19,19 @@ Create one directory per substantive change with the following files.
 
 ## `requirements.md`
 
-Derive requirements from the approved request, existing documentation, or
-commit history and name the source. If the sources are ambiguous, ask before
-adding a requirement. Use `MUST`, `MUST NOT`, `SHOULD`, and `MAY` deliberately.
-Give each requirement at least one observable scenario supported by its source.
+One entry per behavior the baseline must have. Each names its source. Add an
+example only where it makes the behavior easier to see.
 
 ```markdown
 # Requirements
 
-## <CHANGE-ID-001> <Behavior>
+## <ID> <Short name>
 
-Source: <request, document, or commit>
+Source: <the request, the document, or the commit>
 
-The baseline MUST ...
+<What an assistant must do, in a sentence or two.>
 
-### Scenario: <name>
-
-- Given ...
-- When ...
-- Then ...
+Example: <a situation and the expected behavior.>
 ```
 
 ## `tasks.md`
@@ -44,10 +39,10 @@ The baseline MUST ...
 ```markdown
 # Tasks
 
-- [ ] Update the normative baseline.
-- [ ] Add or update model cases and requirement references.
-- [ ] Update the requirement index and documentation where applicable.
+- [ ] Change the baseline.
+- [ ] Update the test cases and their requirement IDs.
+- [ ] Update `specs/requirements.md` and the documentation.
 - [ ] Run `make check`.
-- [ ] Run relevant A/B tests or record why they are deferred.
-- [ ] Archive this change when complete.
+- [ ] Run the affected model cases, or note why not.
+- [ ] Archive this directory.
 ```

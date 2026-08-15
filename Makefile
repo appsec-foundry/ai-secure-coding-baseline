@@ -7,6 +7,7 @@
 ## check       validate the suite itself: no model calls, seconds
 check:
 	python3 tests/selfcheck.py
+	python3 tests/test_selfcheck.py
 
 ## dry-run     print the run matrix without spending anything
 dry-run:
