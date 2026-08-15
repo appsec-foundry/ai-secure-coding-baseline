@@ -19,8 +19,9 @@ a working record, not a deliverable. `../README.md` explains the workflow.
 
 ## `requirements.md`
 
-One entry per behavior the baseline must have. Each names its source. Add an
-example only where it makes the behavior easier to see.
+One entry per behavior the baseline must have. Give it an ID, name its source,
+state the behavior plainly, and say what observable result accepts it. Add an
+example only when it helps.
 
 ```markdown
 # Requirements
@@ -30,6 +31,8 @@ example only where it makes the behavior easier to see.
 Source: <the request, the document, or the commit>
 
 <What an assistant must do, in a sentence or two.>
+
+Acceptance: <the observable result that shows the requirement is met>
 
 Example: <a situation and the expected behavior.>
 ```

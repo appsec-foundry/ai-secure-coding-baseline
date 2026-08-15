@@ -10,6 +10,7 @@ import json
 import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -20,8 +21,14 @@ CHANGES = HERE.parent / "specs" / "changes"
 ARCHIVE = HERE.parent / "specs" / "archive"
 CHANGE_FILES = ("proposal.md", "requirements.md", "tasks.md")
 REQUIREMENT_ID = re.compile(r"AISEC-[A-Z][A-Z0-9]*-\d{3}")
-GROUP_BULLET = re.compile(r"- \*\*\[(AISEC-[^\]]+)\] (.+?):?\*\*")
-INDEX_ROW = re.compile(r"\|\s*`(AISEC-[^`]+)`\s*\|(.+?)\|(.+?)\|(.+?)\|\s*$")
+GROUP_BULLET = re.compile(r"- \*\*\[(AISEC-[^\]]+)\] (.+?):\*\*")
+CATALOG_HEADING = re.compile(r"## (AISEC-[A-Z0-9-]+) — (.+)")
+CATALOG_FIELD = re.compile(r"\*\*([^*]+):\*\*\s*(.*)")
+CATALOG_FIELDS = (
+    "Section", "Normative source", "Applies when", "Requirement",
+    "Observable acceptance", "Model cases", "Evidence and gaps",
+)
+CHANGE_REQUIREMENT = re.compile(r"([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3}) (.+)")
 
 REGEX_KEYS = ["forbidden_regex", "required_regex",
               "reply_forbidden_regex", "reply_required_regex"]
@@ -50,10 +57,12 @@ def load_baseline_groups() -> dict[str, tuple[str, str]]:
 
     groups: dict[str, tuple[str, str]] = {}
     section = ""
-    for line in BASELINE.read_text(encoding="utf-8").splitlines():
+    for lineno, line in enumerate(BASELINE.read_text(encoding="utf-8").splitlines(), 1):
         if line.startswith("## "):
             section = line[3:].strip()
-        bullet = GROUP_BULLET.match(line.strip())
+        bullet = GROUP_BULLET.match(line) if line.startswith("- **") else None
+        if line.startswith("- **") and not bullet:
+            problems.append(f"baseline rule-group bullet on line {lineno} has no valid requirement id")
         for requirement_id in re.findall(r"\[(AISEC-[^\]]+)\]", line):
             if not REQUIREMENT_ID.fullmatch(requirement_id):
                 problems.append(f"baseline has malformed requirement id {requirement_id!r}")
@@ -68,37 +77,161 @@ def load_baseline_groups() -> dict[str, tuple[str, str]]:
     return groups
 
 
-def check_requirement_index(groups: dict[str, tuple[str, str]]) -> None:
-    """The index in specs/ is documentation, so only a check keeps it true."""
+def catalog_entries() -> list[tuple[str, str, dict[str, str]]]:
+    """Parse readable catalog entries without turning Markdown into a DSL."""
     if not INDEX.is_file():
-        problems.append(f"requirement index missing at {INDEX}")
-        return
+        problems.append(f"requirements catalog missing at {INDEX}")
+        return []
+
+    entries: list[tuple[str, str, dict[str, str]]] = []
+    current: tuple[str, str] | None = None
+    fields: dict[str, list[str]] = {}
+    active_field: str | None = None
+
+    def finish() -> None:
+        nonlocal current, fields, active_field
+        if current:
+            entries.append((current[0], current[1],
+                            {name: " ".join(lines).strip()
+                             for name, lines in fields.items()}))
+        current, fields, active_field = None, {}, None
+
+    for line in INDEX.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            finish()
+            heading = CATALOG_HEADING.fullmatch(line)
+            if not heading:
+                problems.append(f"catalog has malformed requirement heading {line!r}")
+                continue
+            current = heading.groups()
+            continue
+        if not current:
+            continue
+        field = CATALOG_FIELD.fullmatch(line)
+        if field:
+            name, value = field.groups()
+            if name in fields:
+                problems.append(f"catalog entry {current[0]} repeats field {name!r}")
+            fields[name] = [value] if value else []
+            active_field = name
+        elif active_field and line.strip():
+            fields[active_field].append(line.strip())
+    finish()
+    return entries
+
+
+def check_requirement_catalog(groups: dict[str, tuple[str, str]]) -> None:
+    """Keep the readable catalog complete and tied to its real sources."""
 
     listed: set[str] = set()
-    for line in INDEX.read_text(encoding="utf-8").splitlines():
-        row = INDEX_ROW.match(line.strip())
-        if not row:
-            continue
-        requirement_id, name, section, cases = (c.strip() for c in row.groups())
+    for requirement_id, name, fields in catalog_entries():
         if requirement_id in listed:
-            problems.append(f"index lists {requirement_id!r} twice")
+            problems.append(f"catalog lists {requirement_id!r} twice")
             continue
         listed.add(requirement_id)
         if requirement_id not in groups:
-            problems.append(f"index lists {requirement_id!r}, which the baseline does not define")
+            problems.append(f"catalog lists {requirement_id!r}, which the baseline does not define")
             continue
         expected_name, expected_section = groups[requirement_id]
         if name != expected_name:
-            problems.append(f"index calls {requirement_id} {name!r}, baseline calls it {expected_name!r}")
-        if section != expected_section:
-            problems.append(f"index puts {requirement_id} in {section!r}, baseline has it in {expected_section!r}")
+            problems.append(f"catalog calls {requirement_id} {name!r}, baseline calls it {expected_name!r}")
+
+        unknown_fields = set(fields) - set(CATALOG_FIELDS)
+        for field in sorted(unknown_fields):
+            problems.append(f"catalog entry {requirement_id} has unknown field {field!r}")
+        for field in CATALOG_FIELDS:
+            if not fields.get(field):
+                problems.append(f"catalog entry {requirement_id} is missing {field!r}")
+
+        section = fields.get("Section", "")
+        if section and section != expected_section:
+            problems.append(f"catalog puts {requirement_id} in {section!r}, "
+                            f"baseline has it in {expected_section!r}")
+        source = fields.get("Normative source", "")
+        if source and ("secure-coding-baseline.md" not in source
+                       or requirement_id not in source):
+            problems.append(f"catalog entry {requirement_id} does not name its baseline rule group")
+
         expected_cases = sorted(coverage.get(requirement_id, []))
-        if sorted(re.findall(r"`([^`]+)`", cases)) != expected_cases:
-            problems.append(f"index coverage for {requirement_id} is not what the cases declare: "
+        model_cases = fields.get("Model cases", "")
+        stated_cases = sorted(re.findall(r"`([^`]+)`", model_cases))
+        if model_cases == "None.":
+            stated_cases = []
+        if not expected_cases and model_cases and model_cases != "None.":
+            problems.append(f"catalog model cases for {requirement_id} must be 'None.'")
+        if stated_cases != expected_cases:
+            problems.append(f"catalog cases for {requirement_id} are not what the cases declare: "
                             f"expected {expected_cases or 'none'}")
+        evidence = fields.get("Evidence and gaps", "")
+        expected_level = "Partial." if expected_cases else "None."
+        if evidence and not evidence.startswith(expected_level):
+            problems.append(f"catalog evidence for {requirement_id} must start with "
+                            f"{expected_level!r}")
 
     for requirement_id in sorted(set(groups) - listed):
-        problems.append(f"index does not list {requirement_id!r}")
+        problems.append(f"catalog does not list {requirement_id!r}")
+
+
+def markdown_sections(path: Path) -> list[tuple[str, str]]:
+    """Return level-two headings and their bodies."""
+    sections: list[tuple[str, list[str]]] = []
+    current = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            current = line[3:].strip()
+            sections.append((current, []))
+        elif current:
+            sections[-1][1].append(line)
+    return [(name, "\n".join(body).strip()) for name, body in sections]
+
+
+def check_change_spec(where: str, directory: Path, archived: bool) -> None:
+    proposal = directory / "proposal.md"
+    requirements = directory / "requirements.md"
+    tasks = directory / "tasks.md"
+    if not all((directory / name).is_file() for name in CHANGE_FILES):
+        return
+
+    proposal_sections: dict[str, str] = {}
+    for heading, body in markdown_sections(proposal):
+        if heading in proposal_sections:
+            problems.append(f"{where}/proposal.md repeats section {heading!r}")
+        proposal_sections[heading] = body
+    for name in ("Problem", "Goal", "Non-goals", "Compatibility"):
+        if not proposal_sections.get(name):
+            problems.append(f"{where}/proposal.md is missing a non-empty {name!r} section")
+
+    requirement_sections = markdown_sections(requirements)
+    if not requirement_sections:
+        problems.append(f"{where}/requirements.md has no requirements")
+    seen_ids: set[str] = set()
+    for heading, body in requirement_sections:
+        match = CHANGE_REQUIREMENT.fullmatch(heading)
+        if not match:
+            problems.append(f"{where}/requirements.md has malformed requirement heading {heading!r}")
+            continue
+        requirement_id = match.group(1)
+        if requirement_id in seen_ids:
+            problems.append(f"{where}/requirements.md repeats {requirement_id!r}")
+        seen_ids.add(requirement_id)
+        source = re.search(r"^Source:\s*(.+)$", body, re.MULTILINE)
+        if not source:
+            problems.append(f"{where}/requirements.md requirement {requirement_id} has no source")
+        acceptance = re.search(r"^Acceptance:\s*(.+)$", body, re.MULTILINE)
+        if not acceptance:
+            problems.append(f"{where}/requirements.md requirement {requirement_id} "
+                            "has no acceptance criterion")
+        behavior = re.sub(r"^(Source|Acceptance):.*$", "", body, flags=re.MULTILINE)
+        behavior = re.sub(r"^###.*$", "", behavior, flags=re.MULTILINE).strip()
+        if not behavior:
+            problems.append(f"{where}/requirements.md requirement {requirement_id} has no behavior text")
+
+    checkboxes = re.findall(r"^- \[([ xX])\] .+", tasks.read_text(encoding="utf-8"),
+                           re.MULTILINE)
+    if not checkboxes:
+        problems.append(f"{where}/tasks.md has no tasks")
+    elif archived and any(mark == " " for mark in checkboxes):
+        problems.append(f"{where}/tasks.md has unfinished tasks in the archive")
 
 
 def check_change_directories() -> None:
@@ -112,8 +245,16 @@ def check_change_directories() -> None:
             for name in CHANGE_FILES:
                 if not (d / name).is_file():
                     problems.append(f"{where} is missing {name}")
-            if parent is ARCHIVE and not re.match(r"\d{4}-\d{2}-\d{2}-", d.name):
-                problems.append(f"{where} should start with a date: <date>-<short-name>")
+            archived = parent == ARCHIVE
+            if archived:
+                match = re.fullmatch(r"(\d{4}-\d{2}-\d{2})-(.+)", d.name)
+                try:
+                    if not match:
+                        raise ValueError
+                    date.fromisoformat(match.group(1))
+                except ValueError:
+                    problems.append(f"{where} should start with a valid date: <date>-<short-name>")
+            check_change_spec(where, d, archived)
 
 
 def check_case(d: Path, baseline_ids: set[str]) -> None:
@@ -123,6 +264,8 @@ def check_case(d: Path, baseline_ids: set[str]) -> None:
         if not (d / required).is_file():
             fail(name, f"missing {required}")
             return
+    if not (d / "prompt.md").read_text(encoding="utf-8").strip():
+        fail(name, "prompt.md is empty")
 
     followups = sorted(d.glob("followup-*.md"))
     numbers = []
@@ -140,6 +283,9 @@ def check_case(d: Path, baseline_ids: set[str]) -> None:
     except json.JSONDecodeError as exc:
         fail(name, f"checks.json does not parse: {exc}")
         return
+    if not isinstance(checks, dict):
+        fail(name, "checks.json must contain an object")
+        return
 
     # A misspelled key is silently ignored at runtime, so the check it was
     # meant to perform never happens and the case still looks healthy.
@@ -148,6 +294,13 @@ def check_case(d: Path, baseline_ids: set[str]) -> None:
 
     if checks.get("mode") not in MODES:
         fail(name, f"mode must be one of {sorted(MODES)}")
+    if not isinstance(checks.get("why"), str) or not checks["why"].strip():
+        fail(name, "why must be a non-empty string")
+
+    for key in ("turns", "reads_inverted", "scope_note", "verify_note",
+                "note_on_the_key", "note_on_the_package"):
+        if key in checks and (not isinstance(checks[key], str) or not checks[key].strip()):
+            fail(name, f"{key} must be a non-empty string")
 
     requirements = checks.get("requirements")
     if not isinstance(requirements, list) or not requirements:
@@ -167,20 +320,40 @@ def check_case(d: Path, baseline_ids: set[str]) -> None:
 
     ids: set[str] = set()
     for key in REGEX_KEYS:
-        for rule in checks.get(key, []):
-            if "id" not in rule or "pattern" not in rule:
+        rules = checks.get(key, [])
+        if not isinstance(rules, list):
+            fail(name, f"{key} must be a list")
+            continue
+        for index, rule in enumerate(rules):
+            if not isinstance(rule, dict):
+                fail(name, f"{key}: item {index} must be an object")
+                continue
+            if not isinstance(rule.get("id"), str) or not rule["id"].strip() \
+                    or not isinstance(rule.get("pattern"), str) or not rule["pattern"]:
                 fail(name, f"{key}: rule needs both id and pattern")
                 continue
             if rule["id"] in ids:
                 fail(name, f"duplicate check id {rule['id']!r}")
             ids.add(rule["id"])
+            globs = rule.get("in")
+            if globs is not None and (not isinstance(globs, list)
+                                      or not globs
+                                      or not all(isinstance(g, str) and g for g in globs)):
+                fail(name, f"{rule['id']}: in must be a non-empty list of globs")
             try:
                 re.compile(rule["pattern"])
             except re.error as exc:
                 fail(name, f"{rule['id']}: pattern does not compile — {exc}")
 
-    for i, item in enumerate(checks.get("judge", [])):
-        if not item.get("q"):
+    judge = checks.get("judge", [])
+    if not isinstance(judge, list):
+        fail(name, "judge must be a list")
+        judge = []
+    for i, item in enumerate(judge):
+        if not isinstance(item, dict):
+            fail(name, f"judge item {i} must be an object")
+            continue
+        if not isinstance(item.get("q"), str) or not item["q"].strip():
             fail(name, f"judge item {i} has no q")
         if item.get("target") not in TARGETS:
             fail(name, f"judge item {i}: target must be one of {sorted(TARGETS)}")
@@ -190,18 +363,49 @@ def check_case(d: Path, baseline_ids: set[str]) -> None:
     if scope_keys and not fixture.is_dir():
         fail(name, f"{', '.join(scope_keys)} needs a fixture/ to compare against")
 
+    for key in ("must_modify", "must_not_modify"):
+        if key in checks and (not isinstance(checks[key], list)
+                              or not checks[key]
+                              or not all(isinstance(path, str) and path
+                                         for path in checks[key])):
+            fail(name, f"{key} must be a non-empty list of paths or globs")
+
     if fixture.is_dir():
         present = {str(p.relative_to(fixture)) for p in fixture.rglob("*") if p.is_file()}
-        for path in checks.get("must_not_modify", []):
+        must_not_modify = checks.get("must_not_modify", [])
+        if not isinstance(must_not_modify, list):
+            must_not_modify = []
+        for path in must_not_modify:
             if path not in present:
                 fail(name, f"must_not_modify names {path!r}, not in the fixture")
-        for path in checks.get("must_modify", []):
+        must_modify = checks.get("must_modify", [])
+        if not isinstance(must_modify, list):
+            must_modify = []
+        for path in must_modify:
             # may legitimately be a file the assistant creates
             if path not in present and "*" not in path:
                 notes.append(f"{name}: must_modify names {path!r}, "
                              f"which the fixture does not contain yet")
 
-    if not checks.get("judge") and not any(checks.get(k) for k in REGEX_KEYS):
+    for key in ("verify", "fixture_precondition"):
+        command = checks.get(key)
+        if command is None:
+            continue
+        if not isinstance(command, dict):
+            fail(name, f"{key} must be an object")
+            continue
+        if not isinstance(command.get("cmd"), str) or not command["cmd"].strip():
+            fail(name, f"{key} needs a non-empty cmd")
+        if not isinstance(command.get("expect_exit"), int):
+            fail(name, f"{key} needs an integer expect_exit")
+        if "why" in command and (not isinstance(command["why"], str)
+                                 or not command["why"].strip()):
+            fail(name, f"{key} why must be a non-empty string")
+
+    has_check = (bool(judge) or any(checks.get(k) for k in REGEX_KEYS)
+                 or any(checks.get(k) for k in ("must_modify", "must_not_modify"))
+                 or bool(checks.get("verify")))
+    if not has_check:
         fail(name, "no checks at all")
 
     run_fixture_precondition(name, d, checks)
@@ -212,6 +416,9 @@ def run_fixture_precondition(name: str, d: Path, checks: dict) -> None:
     pre = checks.get("fixture_precondition")
     if not pre:
         return
+    if (not isinstance(pre, dict) or not isinstance(pre.get("cmd"), str)
+            or not isinstance(pre.get("expect_exit"), int)):
+        return  # check_case already reported the schema problem
     fixture = d / "fixture"
     if not fixture.is_dir():
         fail(name, "fixture_precondition without a fixture/")
@@ -244,7 +451,7 @@ def main() -> int:
         problems.append("no cases found")
     for d in dirs:
         check_case(d, baseline_ids)
-    check_requirement_index(groups)
+    check_requirement_catalog(groups)
     check_change_directories()
 
     for n in notes:

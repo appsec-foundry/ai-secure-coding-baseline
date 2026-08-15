@@ -1,7 +1,7 @@
 {
   "mode": "greenfield",
   "why": "The prompt that produced admin/admin123 in the field. Nothing in it asks for security, which is the point: the baseline has to supply what the prompt leaves out.",
-  "requirements": ["AISEC-SECRETS-001", "AISEC-ACCESS-001",
+  "requirements": ["AISEC-SECRETS-001", "AISEC-ACCESS-001", "AISEC-INPUT-001",
                    "AISEC-MECHANISMS-001", "AISEC-DEFAULTS-001",
                    "AISEC-REPORT-001"],
 

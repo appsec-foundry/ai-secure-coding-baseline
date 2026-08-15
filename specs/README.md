@@ -4,7 +4,8 @@
 shipped to coding assistants as it is. Nothing under `specs/` is normative for
 an assistant; it only records what the baseline contains and how it changes.
 
-- `requirements.md` — the rule groups that exist today and the cases covering them.
+- `requirements.md` — a readable catalog of the current rule groups, acceptance
+  criteria, model evidence, and known gaps.
 - `changes/<name>/` — a change being worked on.
 - `archive/<date>-<name>/` — a change that is finished.
 
@@ -33,7 +34,7 @@ A change directory holds three short files — templates in `changes/README.md`:
 ## Running a change
 
 1. Write the three files.
-2. Change the baseline, the test cases, and the documentation.
+2. Change the baseline, test cases, and documentation as required by the change.
 3. Run `make check`.
 4. Run the model cases the change affects, or note in `tasks.md` why you did
    not. They are evidence, not a gate: they cost money and vary between runs.
@@ -50,23 +51,32 @@ Test cases name the IDs they exercise in their `checks.json`. A rule group
 without a case is not automatically a gap, and not automatically fine. Add a
 case relationship only when the case really observes that behavior.
 
+`requirements.md` explains each group in plain language. The baseline remains
+normative; catalog summaries and acceptance criteria must not add behavior. Each
+entry identifies its model cases and says which parts they do not cover.
+
 ## What is enforced
 
 `make check` runs on every push and pull request
 (`.github/workflows/check.yml`), takes about a second, and never calls a model.
 It fails on:
 
-- an ID that is duplicated, malformed, or not attached to a rule group;
+- a rule group without an ID, or an ID that is duplicated, malformed, or not
+  attached to a rule group;
 - a case naming an ID the baseline does not define;
-- a row in `requirements.md` that no longer matches the baseline or the cases;
-- a change directory missing one of its three files, or an archived one whose
-  name does not start with a date;
-- a case with an unknown key, a pattern that does not compile, or no checks;
+- a missing, duplicate, unknown, or incomplete catalog entry, or one whose name,
+  section, source, evidence level, or case list no longer matches;
+- a change directory with missing or incomplete proposal, requirement, or task
+  content, including an invalid archive date or unfinished archived task;
+- malformed case metadata, an unknown key, a pattern that does not compile, or
+  a case with no observable checks;
 - a fixture that no longer starts in the state its case depends on.
 
-`tests/test_selfcheck.py` breaks a throwaway repository in each of those ways
-and expects the complaint, so the check itself cannot rot unnoticed.
+`tests/test_selfcheck.py` breaks a throwaway repository in representative ways
+from every category and expects the complaint, so the main guard paths cannot
+quietly disappear.
 
-Nothing here can tell whether a requirement really came from the source it
-names, or whether the rule is any good. That needs a reader. Whether an
-assistant actually follows it needs a model run.
+The deterministic checks enforce structure and traceability. A reviewer still
+has to confirm that a summary is faithful, a source supports its requirement,
+and a case really observes the behavior it names. Model runs measure whether an
+assistant follows the baseline; they remain stochastic evidence, not a CI gate.

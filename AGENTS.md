@@ -12,7 +12,8 @@ Two rules hold no matter how small the change looks:
 - Requirements come only from an explicit user request, existing repository
   documentation, or commit history that clearly establishes the behavior. Name
   the source. If none of them settles a question, ask instead of deciding it.
-- Rule text lives in `secure-coding-baseline.md` and nowhere else.
+- Normative rule text lives in `secure-coding-baseline.md`. The requirements
+  catalog may explain it, but must not add or change behavior.
 
 Run `make check` after changing the baseline, the specs, test metadata, or the
 harness.

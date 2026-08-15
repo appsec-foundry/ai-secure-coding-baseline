@@ -45,7 +45,7 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 Read the complete rules in [secure-coding-baseline.md](secure-coding-baseline.md). They cover the essentials: access control, untrusted input, secrets, secure defaults, authentication, dependencies, logging, resource limits, tests, and LLM features. The first four rules are non-negotiable.
 
-The assistant applies the rules to the task at hand, keeps changes focused, and reviews its work before finishing. If a meaningful security risk remains, it explains what was done, what is missing, and what still needs verification.
+The assistant applies the rules to the task at hand, keeps changes focused, and reviews its work before finishing. It asks before implementing a materially riskier user choice, and if a meaningful security risk remains, explains what was done, what is missing, and what still needs verification.
 
 The focus here is deliberately narrow: influence how a coding assistant behaves
 while it designs and changes software. The baseline supplies secure defaults and
@@ -192,10 +192,11 @@ Runs cost tokens and time; at affordable sample sizes the results show direction
 
 ## Changing the baseline
 
-The baseline is the specification. Each rule group carries a stable ID like
-`AISEC-AUTH-001`, and test cases reference those IDs instead of repeating
-section names. [`specs/requirements.md`](specs/requirements.md) lists every
-group with the cases that exercise it.
+The baseline is the normative specification. Each rule group carries a stable
+ID like `AISEC-AUTH-001`, and test cases reference those IDs.
+[`specs/requirements.md`](specs/requirements.md) is the readable catalog: it
+explains when each group applies, its expected result, the model cases that
+exercise it, and their known gaps.
 
 A change that could alter how an assistant behaves starts with a short
 proposal, requirements that name their source, and a task list under
@@ -204,8 +205,8 @@ done. Editorial changes skip that. [`specs/README.md`](specs/README.md) has the
 workflow; repository agents get it from [`AGENTS.md`](AGENTS.md), which
 [`CLAUDE.md`](CLAUDE.md) imports for Claude Code.
 
-`make check` validates the IDs, the case references, and the index against the
-baseline in seconds, without calling a model.
+`make check` validates the IDs, catalog structure, change specifications, case
+metadata, and their cross-references in seconds, without calling a model.
 
 ## Background
 

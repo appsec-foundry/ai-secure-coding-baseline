@@ -8,6 +8,9 @@ development in the agent instructions.
 The repository-wide agent instructions MUST require the workflow documented in
 `specs/README.md` for changes that could alter expected assistant behavior.
 
+Acceptance: a repository agent is directed to read and follow the workflow
+before making an applicable change.
+
 ### Scenario: substantive baseline change
 
 - Given an agent is asked to change expected assistant behavior
@@ -24,6 +27,9 @@ Agents MUST derive requirements only from an approved user request, existing
 normative repository documentation, or commit history that clearly establishes
 the behavior. They MUST ask before recording or implementing a normative choice
 that those sources do not settle.
+
+Acceptance: every recorded requirement names an allowed source, and unresolved
+normative choices are put to the user.
 
 ### Scenario: ambiguous source
 
@@ -46,6 +52,8 @@ Claude Code `@` import for project instructions.
 Codex-compatible agents MUST receive the maintenance workflow from the root
 `AGENTS.md`, and Claude Code MUST import that file from root `CLAUDE.md`.
 
+Acceptance: both instruction-loading paths include the same maintenance rules.
+
 ### Scenario: repository session
 
 - Given Codex or Claude Code starts in the repository
@@ -59,6 +67,9 @@ Source: `README.md` and `specs/README.md` identify
 
 Agent instructions MUST point to the baseline and specification documents
 instead of reproducing their normative contents.
+
+Acceptance: repository instruction files refer to the normative baseline rather
+than copying its rule prose.
 
 ### Scenario: future workflow edit
 
