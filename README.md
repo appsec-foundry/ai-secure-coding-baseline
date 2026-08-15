@@ -58,7 +58,8 @@ and its risks. Those specifications provide stronger assurance only when each
 important requirement has a stated way to verify it, such as an automated test,
 a CI check, a review gate, or a runtime guard. Not every requirement can be
 automated, but a specification without evidence is still guidance rather than
-an enforceable control.
+an enforceable control. [`examples/claude-code-gate/`](examples/claude-code-gate/)
+shows one such check and where it stops.
 
 ## Using it
 
@@ -197,6 +198,24 @@ python3 tests/run.py --cases greenfield-order-app  # one case, both arms
 ```
 
 Runs cost tokens and time; at affordable sample sizes the results show direction rather than significance. See [tests/README.md](tests/README.md).
+
+## An example gate
+
+The cases above ask whether an assistant follows the rules.
+[`examples/claude-code-gate/`](examples/claude-code-gate/) assumes it sometimes
+will not: a Claude Code `PreToolUse` hook that refuses nine patterns and names
+the rule group behind each refusal — TLS verification switched off, auth behind
+a flag, `pickle.loads`, a password through SHA-256, a token from `Math.random()`,
+a credential literal, a default password, a wildcard CORS origin with
+credentials, `debug=True`.
+
+It is an example, not a control the baseline provides, and it is deliberately
+short. Everything that needs context to judge — a bind to `0.0.0.0`, SQL built
+with an f-string, a new dependency — is left out, because a gate that denies
+ordinary code gets uninstalled. Everything about the resulting state — whether
+the new route has an authorization check, whether the login endpoint is rate
+limited — is invisible to a hook that sees one edit, and belongs in a check over
+the diff or in CI.
 
 ## Changing the baseline
 

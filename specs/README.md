@@ -75,6 +75,11 @@ It fails on:
   a case with no observable checks;
 - a fixture that no longer starts in the state its case depends on.
 
+It also runs `examples/claude-code-gate/test_gate.py`, which keeps the example
+gate honest: every rule denies its sample and allows an ordinary one, and every
+rule id it cites still names a rule group in the baseline. The example is not
+normative and nothing else depends on it.
+
 `tests/test_selfcheck.py` breaks a throwaway repository in representative ways
 from every category and expects the complaint, so the main guard paths cannot
 quietly disappear.

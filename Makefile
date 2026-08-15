@@ -8,6 +8,7 @@
 check:
 	python3 tests/selfcheck.py
 	python3 tests/test_selfcheck.py
+	python3 examples/claude-code-gate/test_gate.py
 
 ## dry-run     print the run matrix without spending anything
 dry-run:
