@@ -179,6 +179,10 @@ Claude Code can confirm loading directly, which the id cannot:
 
 Prefer an import, symlink, or registered filename so there is only ever one copy. Where a tool supports none of these, keep `secure-coding-baseline.md` as the source of truth and generate the copied instruction files from it rather than editing them by hand. An organization template can provide those files to new repositories.
 
+This repository follows that rule for its own combined `AGENTS.md`: edit only
+the normative `secure-coding-baseline.md`, then run `make sync-agents` to
+refresh the generated block. `make check` rejects drift between the two files.
+
 ## Testing the baseline
 
 `tests/` holds a harness that runs the same prompt with the baseline installed and without it, and reports the difference. Cases cover greenfield work, scoped changes to an existing application, pressure to weaken a control, a riskier-but-permitted design choice, and overrides in both directions.
@@ -202,8 +206,9 @@ A change that could alter how an assistant behaves starts with a short
 proposal, requirements that name their source, and a task list under
 [`specs/changes/`](specs/changes/), and moves to `specs/archive/` when it is
 done. Editorial changes skip that. [`specs/README.md`](specs/README.md) has the
-workflow; repository agents get it from [`AGENTS.md`](AGENTS.md), which
-[`CLAUDE.md`](CLAUDE.md) imports for Claude Code.
+workflow. Repository agents get it together with a generated copy of the
+baseline from [`AGENTS.md`](AGENTS.md); [`CLAUDE.md`](CLAUDE.md) imports that
+combined file for Claude Code.
 
 `make check` validates the IDs, catalog structure, change specifications, case
 metadata, and their cross-references in seconds, without calling a model.

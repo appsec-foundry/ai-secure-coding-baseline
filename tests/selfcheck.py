@@ -14,12 +14,16 @@ from datetime import date
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
 CASES = HERE / "cases"
-BASELINE = HERE.parent / "secure-coding-baseline.md"
-INDEX = HERE.parent / "specs" / "requirements.md"
-CHANGES = HERE.parent / "specs" / "changes"
-ARCHIVE = HERE.parent / "specs" / "archive"
+BASELINE = ROOT / "secure-coding-baseline.md"
+AGENTS = ROOT / "AGENTS.md"
+INDEX = ROOT / "specs" / "requirements.md"
+CHANGES = ROOT / "specs" / "changes"
+ARCHIVE = ROOT / "specs" / "archive"
 CHANGE_FILES = ("proposal.md", "requirements.md", "tasks.md")
+AGENTS_BASELINE_BEGIN = "<!-- BEGIN GENERATED SECURE CODING BASELINE -->"
+AGENTS_BASELINE_END = "<!-- END GENERATED SECURE CODING BASELINE -->"
 REQUIREMENT_ID = re.compile(r"AISEC-[A-Z][A-Z0-9]*-\d{3}")
 GROUP_BULLET = re.compile(r"- \*\*\[(AISEC-[^\]]+)\] (.+?):\*\*")
 CATALOG_HEADING = re.compile(r"## (AISEC-[A-Z0-9-]+) — (.+)")
@@ -75,6 +79,28 @@ def load_baseline_groups() -> dict[str, tuple[str, str]]:
     if not groups:
         problems.append("baseline has no requirement ids")
     return groups
+
+
+def check_agents_baseline() -> None:
+    """The shared agent file must carry the exact normative baseline."""
+    if not BASELINE.is_file():
+        return  # load_baseline_groups already reported the missing source
+    if not AGENTS.is_file():
+        problems.append(f"agent instructions missing at {AGENTS}")
+        return
+
+    agents = AGENTS.read_text(encoding="utf-8")
+    if (agents.count(AGENTS_BASELINE_BEGIN) != 1
+            or agents.count(AGENTS_BASELINE_END) != 1):
+        problems.append("AGENTS.md must contain exactly one generated baseline block")
+        return
+    _, generated = agents.split(AGENTS_BASELINE_BEGIN, 1)
+    embedded, suffix = generated.split(AGENTS_BASELINE_END, 1)
+    baseline = BASELINE.read_text(encoding="utf-8").rstrip("\n")
+    expected = f"\n\n{baseline}\n\n"
+    if embedded != expected or suffix != "\n":
+        problems.append("AGENTS.md generated baseline differs from secure-coding-baseline.md; "
+                        "run make sync-agents")
 
 
 def catalog_entries() -> list[tuple[str, str, dict[str, str]]]:
@@ -439,6 +465,7 @@ def run_fixture_precondition(name: str, d: Path, checks: dict) -> None:
 def main() -> int:
     groups = load_baseline_groups()
     baseline_ids = set(groups)
+    check_agents_baseline()
 
     try:
         subprocess.run([sys.executable, "-m", "py_compile", str(HERE / "run.py")],

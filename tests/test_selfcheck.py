@@ -85,12 +85,19 @@ The system must make the behavior clear.
 Acceptance: the resulting behavior is unambiguous.
 """
 
+AGENTS_BASELINE_BEGIN = "<!-- BEGIN GENERATED SECURE CODING BASELINE -->"
+AGENTS_BASELINE_END = "<!-- END GENERATED SECURE CODING BASELINE -->"
+
 
 def build(root: Path) -> None:
     """A miniature of this repository: baseline, catalog, one case, the guard."""
     (root / "specs").mkdir()
     (root / "tests" / "cases" / "demo-case").mkdir(parents=True)
     (root / "secure-coding-baseline.md").write_text(BASELINE)
+    (root / "AGENTS.md").write_text(
+        f"# Repository instructions\n\n{AGENTS_BASELINE_BEGIN}\n\n"
+        f"{BASELINE.rstrip()}\n\n{AGENTS_BASELINE_END}\n"
+    )
     (root / "specs" / "requirements.md").write_text(CATALOG)
     (root / "tests" / "cases" / "demo-case" / "prompt.md").write_text("do the thing\n")
     (root / "tests" / "cases" / "demo-case" / "checks.json").write_text(CHECKS)
@@ -122,6 +129,12 @@ def add_failing_precondition(root: Path) -> None:
 # what selfcheck must say; None means it must stay silent and pass.
 CASES = [
     ("intact repository", lambda r: None, None),
+    ("generated agent baseline has drifted",
+     lambda r: edit(r / "AGENTS.md", "Do the safe thing", "Do something else"),
+     "AGENTS.md generated baseline differs"),
+    ("generated agent baseline block is missing",
+     lambda r: (r / "AGENTS.md").write_text("# Repository instructions\n"),
+     "AGENTS.md must contain exactly one generated baseline block"),
     ("rule group renamed in the baseline",
      lambda r: edit(r / "secure-coding-baseline.md", "First rule", "Renamed rule"),
      "catalog calls AISEC-DEMO-001"),

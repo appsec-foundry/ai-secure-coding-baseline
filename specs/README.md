@@ -63,6 +63,8 @@ It fails on:
 
 - a rule group without an ID, or an ID that is duplicated, malformed, or not
   attached to a rule group;
+- an `AGENTS.md` whose generated baseline block is missing or differs from the
+  normative baseline;
 - a case naming an ID the baseline does not define;
 - a missing, duplicate, unknown, or incomplete catalog entry, or one whose name,
   section, source, evidence level, or case list no longer matches;
