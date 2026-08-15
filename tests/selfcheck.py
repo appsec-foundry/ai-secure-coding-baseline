@@ -18,12 +18,13 @@ ROOT = HERE.parent
 CASES = HERE / "cases"
 BASELINE = ROOT / "secure-coding-baseline.md"
 AGENTS = ROOT / "AGENTS.md"
+CLAUDE = ROOT / "CLAUDE.md"
 INDEX = ROOT / "specs" / "requirements.md"
 CHANGES = ROOT / "specs" / "changes"
 ARCHIVE = ROOT / "specs" / "archive"
 CHANGE_FILES = ("proposal.md", "requirements.md", "tasks.md")
-AGENTS_BASELINE_BEGIN = "<!-- BEGIN GENERATED SECURE CODING BASELINE -->"
-AGENTS_BASELINE_END = "<!-- END GENERATED SECURE CODING BASELINE -->"
+AGENTS_BASELINE_REFERENCE = "[`secure-coding-baseline.md`](secure-coding-baseline.md)"
+AGENTS_BASELINE_MARKER = "GENERATED SECURE CODING BASELINE"
 REQUIREMENT_ID = re.compile(r"AISEC-[A-Z][A-Z0-9]*-\d{3}")
 GROUP_BULLET = re.compile(r"- \*\*\[(AISEC-[^\]]+)\] (.+?):\*\*")
 CATALOG_HEADING = re.compile(r"## (AISEC-[A-Z0-9-]+) — (.+)")
@@ -81,26 +82,27 @@ def load_baseline_groups() -> dict[str, tuple[str, str]]:
     return groups
 
 
-def check_agents_baseline() -> None:
-    """The shared agent file must carry the exact normative baseline."""
-    if not BASELINE.is_file():
-        return  # load_baseline_groups already reported the missing source
+def check_agent_instructions() -> None:
+    """Agent files must reference or import the one normative baseline."""
     if not AGENTS.is_file():
         problems.append(f"agent instructions missing at {AGENTS}")
         return
 
     agents = AGENTS.read_text(encoding="utf-8")
-    if (agents.count(AGENTS_BASELINE_BEGIN) != 1
-            or agents.count(AGENTS_BASELINE_END) != 1):
-        problems.append("AGENTS.md must contain exactly one generated baseline block")
+    if AGENTS_BASELINE_REFERENCE not in agents or "read and follow" not in agents:
+        problems.append("AGENTS.md must require agents to read and follow "
+                        "secure-coding-baseline.md")
+    if AGENTS_BASELINE_MARKER in agents:
+        problems.append("AGENTS.md must reference secure-coding-baseline.md instead of "
+                        "embedding a generated baseline block")
+
+    if not CLAUDE.is_file():
+        problems.append(f"Claude instructions missing at {CLAUDE}")
         return
-    _, generated = agents.split(AGENTS_BASELINE_BEGIN, 1)
-    embedded, suffix = generated.split(AGENTS_BASELINE_END, 1)
-    baseline = BASELINE.read_text(encoding="utf-8").rstrip("\n")
-    expected = f"\n\n{baseline}\n\n"
-    if embedded != expected or suffix != "\n":
-        problems.append("AGENTS.md generated baseline differs from secure-coding-baseline.md; "
-                        "run make sync-agents")
+    imports = CLAUDE.read_text(encoding="utf-8").splitlines()
+    for expected in ("@AGENTS.md", "@secure-coding-baseline.md"):
+        if imports.count(expected) != 1:
+            problems.append(f"CLAUDE.md must import {expected[1:]} exactly once")
 
 
 def catalog_entries() -> list[tuple[str, str, dict[str, str]]]:
@@ -465,7 +467,7 @@ def run_fixture_precondition(name: str, d: Path, checks: dict) -> None:
 def main() -> int:
     groups = load_baseline_groups()
     baseline_ids = set(groups)
-    check_agents_baseline()
+    check_agent_instructions()
 
     try:
         subprocess.run([sys.executable, "-m", "py_compile", str(HERE / "run.py")],

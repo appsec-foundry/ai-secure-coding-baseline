@@ -175,13 +175,17 @@ Claude Code can confirm loading directly, which the id cannot:
 - `claude --debug` — logs instruction-file discovery and import resolution at startup.
 - After the fact: `grep -c "Non-negotiable" ~/.claude/projects/<project-slug>/<session-id>.jsonl`. A `0` means the baseline was never in context.
 
-### Keeping the copies in sync
+### Keeping one normative source
 
 Prefer an import, symlink, or registered filename so there is only ever one copy. Where a tool supports none of these, keep `secure-coding-baseline.md` as the source of truth and generate the copied instruction files from it rather than editing them by hand. An organization template can provide those files to new repositories.
 
-This repository follows that rule for its own combined `AGENTS.md`: edit only
-the normative `secure-coding-baseline.md`, then run `make sync-agents` to
-refresh the generated block. `make check` rejects drift between the two files.
+This repository keeps its requirements separate: `AGENTS.md` contains the
+repository workflow and requires agents to read the normative
+`secure-coding-baseline.md`; it does not duplicate the baseline. `CLAUDE.md`
+imports both files because Claude Code supports native imports. For agents that
+do not resolve file references, the `AGENTS.md` reference is an instruction to
+read the baseline rather than an automatic import. `make check` verifies the
+reference and rejects a reintroduced generated block.
 
 ## Testing the baseline
 
@@ -206,9 +210,9 @@ A change that could alter how an assistant behaves starts with a short
 proposal, requirements that name their source, and a task list under
 [`specs/changes/`](specs/changes/), and moves to `specs/archive/` when it is
 done. Editorial changes skip that. [`specs/README.md`](specs/README.md) has the
-workflow. Repository agents get it together with a generated copy of the
-baseline from [`AGENTS.md`](AGENTS.md); [`CLAUDE.md`](CLAUDE.md) imports that
-combined file for Claude Code.
+workflow. [`AGENTS.md`](AGENTS.md) points repository agents to the normative
+baseline without duplicating it; [`CLAUDE.md`](CLAUDE.md) imports both the
+repository instructions and the baseline for Claude Code.
 
 `make check` validates the IDs, catalog structure, change specifications, case
 metadata, and their cross-references in seconds, without calling a model.

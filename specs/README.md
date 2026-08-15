@@ -63,8 +63,9 @@ It fails on:
 
 - a rule group without an ID, or an ID that is duplicated, malformed, or not
   attached to a rule group;
-- an `AGENTS.md` whose generated baseline block is missing or differs from the
-  normative baseline;
+- an `AGENTS.md` that does not require agents to read the normative baseline,
+  reintroduces a generated baseline copy, or is not paired with the required
+  Claude imports;
 - a case naming an ID the baseline does not define;
 - a missing, duplicate, unknown, or incomplete catalog entry, or one whose name,
   section, source, evidence level, or case list no longer matches;

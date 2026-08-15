@@ -2,16 +2,12 @@
 # so the expensive targets run the free self-check before spending anything.
 
 .DEFAULT_GOAL := check
-.PHONY: check sync-agents dry-run test test-all clean-results help
+.PHONY: check dry-run test test-all clean-results help
 
 ## check       validate the suite itself: no model calls, seconds
 check:
 	python3 tests/selfcheck.py
 	python3 tests/test_selfcheck.py
-
-## sync-agents refresh the baseline embedded in AGENTS.md
-sync-agents:
-	python3 scripts/sync_agents.py
 
 ## dry-run     print the run matrix without spending anything
 dry-run:
