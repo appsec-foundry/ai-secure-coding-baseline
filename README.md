@@ -47,6 +47,19 @@ Read the complete rules in [secure-coding-baseline.md](secure-coding-baseline.md
 
 The assistant applies the rules to the task at hand, keeps changes focused, and reviews its work before finishing. If a meaningful security risk remains, it explains what was done, what is missing, and what still needs verification.
 
+The focus here is deliberately narrow: influence how a coding assistant behaves
+while it designs and changes software. The baseline supplies secure defaults and
+pushes back on common shortcuts, but it is not a security specification for the
+application being built.
+
+Projects that need more can add specification-driven security requirements:
+concrete, application-specific expectations derived from the system, its data,
+and its risks. Those specifications provide stronger assurance only when each
+important requirement has a stated way to verify it, such as an automated test,
+a CI check, a review gate, or a runtime guard. Not every requirement can be
+automated, but a specification without evidence is still guidance rather than
+an enforceable control.
+
 ## Using it
 
 Every tool loads project instructions from its own fixed locations, so installing the baseline means putting it where the tool already looks. Three cases cover the field: **Claude Code**, which reads only its own files; **GitHub Copilot**, which uses its own locations on several surfaces; and **every other agent**, which reads the shared [`AGENTS.md`](https://agents.md/).
