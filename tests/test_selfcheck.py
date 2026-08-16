@@ -85,16 +85,11 @@ The system must make the behavior clear.
 Acceptance: the resulting behavior is unambiguous.
 """
 
-AGENTS = f"""\
+AGENTS = """\
 # Repository instructions
 
-The baseline below is generated from `secure-coding-baseline.md`.
-
-<!-- BEGIN GENERATED SECURE CODING BASELINE -->
-
-{BASELINE.rstrip()}
-
-<!-- END GENERATED SECURE CODING BASELINE -->
+Before doing any repository work, read and follow
+[`secure-coding-baseline.md`](secure-coding-baseline.md); it is normative.
 """
 
 
@@ -104,7 +99,7 @@ def build(root: Path) -> None:
     (root / "tests" / "cases" / "demo-case").mkdir(parents=True)
     (root / "secure-coding-baseline.md").write_text(BASELINE)
     (root / "AGENTS.md").write_text(AGENTS)
-    (root / "CLAUDE.md").write_text("@AGENTS.md\n")
+    (root / "CLAUDE.md").write_text("@AGENTS.md\n@secure-coding-baseline.md\n")
     (root / "specs" / "requirements.md").write_text(CATALOG)
     (root / "tests" / "cases" / "demo-case" / "prompt.md").write_text("do the thing\n")
     (root / "tests" / "cases" / "demo-case" / "checks.json").write_text(CHECKS)
@@ -136,19 +131,17 @@ def add_failing_precondition(root: Path) -> None:
 # what selfcheck must say; None means it must stay silent and pass.
 CASES = [
     ("intact repository", lambda r: None, None),
-    ("generated agent baseline block is missing",
+    ("agent baseline reference is missing",
      lambda r: (r / "AGENTS.md").write_text("# Repository instructions\n"),
-     "AGENTS.md must contain exactly one generated baseline block"),
-    ("embedded baseline drifted from the normative file",
-     lambda r: edit(r / "AGENTS.md", "First rule", "Stale rule"),
-     "run make sync-agents"),
-    ("Claude agent import is missing",
-     lambda r: (r / "CLAUDE.md").write_text("# nothing imported\n"),
-     "CLAUDE.md must import AGENTS.md exactly once"),
-    ("Claude imports the baseline a second time",
-     lambda r: edit(r / "CLAUDE.md", "@AGENTS.md\n",
-                    "@AGENTS.md\n@secure-coding-baseline.md\n"),
-     "CLAUDE.md must not import secure-coding-baseline.md"),
+     "AGENTS.md must require agents to read and follow"),
+    ("generated agent baseline block is reintroduced",
+     lambda r: edit(r / "AGENTS.md", "# Repository instructions",
+                    "# Repository instructions\n\n"
+                    "<!-- BEGIN GENERATED SECURE CODING BASELINE -->"),
+     "AGENTS.md must reference secure-coding-baseline.md instead of embedding"),
+    ("Claude baseline import is missing",
+     lambda r: edit(r / "CLAUDE.md", "@secure-coding-baseline.md\n", ""),
+     "CLAUDE.md must import secure-coding-baseline.md exactly once"),
     ("rule group renamed in the baseline",
      lambda r: edit(r / "secure-coding-baseline.md", "First rule", "Renamed rule"),
      "catalog calls AISEC-DEMO-001"),
