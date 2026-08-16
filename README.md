@@ -24,7 +24,7 @@ A short set of secure-coding rules for AI coding assistants. Add it to a project
 >
 > This baseline guides an LLM; it is not an enforceable control or a guarantee of secure code. Supplement it with project-specific instructions and independently validate changes through review, tests, dependency and secret scanning, SAST, and CI or pre-commit checks as appropriate.
 
-The baseline is deliberately compact: ~16.7 KB, roughly 3,350–3,900 model tokens, including one condensed rule for LLM-powered features. Counts vary by tokenizer—3,364 measured on current GPT models (`o200k_base`); Claude's tokenizer produces about 15% more for this text. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
+The baseline is deliberately compact: 19 KB, including one condensed rule for LLM-powered features. Counts vary by tokenizer—3,897 measured on current GPT models (`o200k_base`); Claude's tokenizer produces about 15% more for this text, so budget roughly 4,500. The wording has been reviewed and refined through AI-assisted coding tasks—practical testing, not a formal security certification.
 
 ## Why this exists
 
@@ -43,23 +43,62 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 ## The rules
 
-Read the complete rules in [secure-coding-baseline.md](secure-coding-baseline.md). They cover the essentials: access control, untrusted input, secrets, secure defaults, authentication, dependencies, logging, resource limits, tests, and LLM features. The first four rules are non-negotiable.
+[secure-coding-baseline.md](secure-coding-baseline.md) is the complete text. Four
+groups are marked non-negotiable, and each of them names a mechanism rather than
+a goal:
 
-The assistant applies the rules to the task at hand, keeps changes focused, and reviews its work before finishing. It asks before implementing a materially riskier user choice, and if a meaningful security risk remains, explains what was done, what is missing, and what still needs verification.
+- `AISEC-ACCESS-001` — authenticate and authorize on the server for every
+  protected action, and bind the authenticated identity to the requested
+  resource. A client-side check is not a check, and network position is not
+  identity.
+- `AISEC-INPUT-001` — validate type, range, and format at each trust boundary,
+  then parameterized queries, contextual output encoding, safe path handling,
+  shell-free process calls. Nothing untrusted reaches an unsafe deserializer.
+- `AISEC-SECRETS-001` — no real secret in the repository or in logs, and no
+  working default, demo, or shared credential anywhere, seed data and docs
+  included. The first administrative credential comes from configuration, or is
+  generated at first start and shown once to the operator.
+- `AISEC-PRESERVE-001` — never weaken a control to make code work or a test
+  pass. A control that can be switched off is weakened, flag or not.
 
-The focus here is deliberately narrow: influence how a coding assistant behaves
-while it designs and changes software. The baseline supplies secure defaults and
-pushes back on common shortcuts, but it is not a security specification for the
-application being built.
+The other groups cover secure defaults and transport, authentication abuse
+resistance, proven mechanisms and cryptography, dependencies, errors and
+logging, resource limits, production versus development, security tests, and
+LLM-powered features. [`specs/requirements.md`](specs/requirements.md) says when
+each group applies and what it expects.
 
-Projects that need more can add specification-driven security requirements:
-concrete, application-specific expectations derived from the system, its data,
-and its risks. Those specifications provide stronger assurance only when each
-important requirement has a stated way to verify it, such as an automated test,
-a CI check, a review gate, or a runtime guard. Not every requirement can be
-automated, but a specification without evidence is still guidance rather than
-an enforceable control. [`examples/claude-code-gate/`](examples/claude-code-gate/)
-shows one such check and where it stops.
+## What the assistant does with them
+
+Half the baseline is not requirements but the procedure around them.
+
+It classifies the work first. In an existing application the rules apply to what
+the assistant writes or changes: reuse the project's mechanisms, make the
+smallest compliant change, report pre-existing problems instead of quietly
+fixing them. In greenfield work, controls, configuration, and tests belong to
+the design and are verified before the first release. If the case is unclear it
+asks, rather than treating a deployed application as a fresh start.
+
+It holds under goal pressure. A failing test or a deadline is no reason to
+switch a control off. Only where the user knowingly aims at the control itself
+does the assistant stop and ask, naming the rule, the exposure, and the
+alternative.
+
+It reports what it delivered. Problems found in scope are named with location
+and impact, fixed or not. Where a change moves what a control covers or what is
+reachable, the reply ends with a security note:
+
+> **Production use:** No. Supply `ADMIN_PASSWORD` through the environment,
+> which startup now requires, and terminate TLS before the service leaves
+> localhost.
+>
+> **Implemented:** Every `/api/orders` route requires a session and checks that
+> the order belongs to the caller; tests cover the cross-user case. Login is
+> rate limited per account and per source address.
+>
+> **Left out:** Dependency scanning is not wired into CI.
+>
+> **Unverified:** The service was not started, so the response headers are
+> configured but unexecuted.
 
 ## Using it
 
@@ -189,6 +228,29 @@ imports both files because Claude Code supports native imports. For agents that
 do not resolve file references, the `AGENTS.md` reference is an instruction to
 read the baseline rather than an automatic import. `make check` verifies the
 reference and rejects a reintroduced generated block.
+
+## Adapting it
+
+The text is meant as a starting point for an organization's own rules. Sharpen
+it where your stack needs more: the approved crypto library, the framework, the
+review step a change has to pass. Keep the group ID on a rule you extend, since
+the test cases and [`specs/requirements.md`](specs/requirements.md) reference
+those IDs. Once the text differs, change the baseline id to say so,
+`aisec-0.1+acme`, so `baseline?` names your version instead of implying this
+one—see the [id convention](#verify-it-loaded).
+
+Rolling out organization-wide uses the per-tool locations above: managed policy
+for Claude Code, organization custom instructions for Copilot, a distributed
+`AGENTS.md` for the rest. Keep enforceable runtime policy in managed
+configuration; the instruction file guides, the configuration constrains.
+
+What does not belong in it is the security specification of the system you are
+building. The baseline governs how an assistant behaves, not what your
+application must do. That is a separate, application-specific set of
+requirements, and it only provides assurance where each one has a stated way to
+verify it—a test, a CI check, a review gate, a runtime guard.
+[`examples/claude-code-gate/`](examples/claude-code-gate/) shows one such check
+and where it stops.
 
 ## Testing the baseline
 
