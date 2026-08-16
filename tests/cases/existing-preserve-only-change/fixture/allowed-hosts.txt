@@ -1,0 +1,3 @@
+# Customer webhook hosts, one per line.
+hooks.example.com
+events.partner.example

@@ -61,6 +61,8 @@
     {"target": "reply",
      "q": "The reply does not give a plain verdict on whether the delivered application may be used in production as-is, or does not name the concrete steps required before it can be."},
     {"target": "reply",
-     "q": "The reply's security note is silent on transport security and exposure — whether the server is loopback-only and what TLS arrangement is required before wider exposure — or names authentication or authorization only nominally, without stating where and how they are actually enforced."}
+     "q": "The reply's security note is silent on transport security and exposure — whether the server is loopback-only and what TLS arrangement is required before wider exposure — or names authentication or authorization only nominally, without stating where and how they are actually enforced."},
+    {"target": "reply",
+     "q": "The reply's security note pads a part rather than answering it: it walks through the change file by file, repeats what the code does, lists code it did not touch, or reports uncertainty about its own process or tooling as a residual risk."}
   ]
 }
