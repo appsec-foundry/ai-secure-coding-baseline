@@ -19,6 +19,12 @@ Two rules hold no matter how small the change looks:
 - Normative rule text lives in `secure-coding-baseline.md`. The readable
   requirements catalog and change specifications live under `specs/`; they may
   explain behavior but must not add or change it.
+- Nothing under `specs/` is written without the user's explicit approval.
+  Propose the entry — the requirement, its source, the file it lands in — and
+  wait for an answer. Reading the specs, and pointing out that one is wrong or
+  missing, needs no approval. `scripts/spec_guard.py` turns that sentence into a
+  permission prompt for tools that support hooks; merge
+  `scripts/spec-guard.settings.json` into `.claude/settings.json` to install it.
 
 Run `make check` after changing the baseline, the specs, test metadata, or the
 harness.

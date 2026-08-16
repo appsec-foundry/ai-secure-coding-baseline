@@ -475,7 +475,8 @@ def main() -> int:
     except subprocess.CalledProcessError as exc:
         problems.append(f"run.py does not compile: {exc.stderr.decode()[:400]}")
 
-    dirs = sorted(p for p in CASES.iterdir() if p.is_dir())
+    dirs = sorted(p for p in CASES.iterdir()
+                  if p.is_dir() and not p.name.startswith("."))
     if not dirs:
         problems.append("no cases found")
     for d in dirs:

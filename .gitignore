@@ -12,7 +12,9 @@
 .vscode
 
 # Assistant / tooling config
-.claude/
+.claude/*
+# except the project settings that install scripts/spec_guard.py
+!.claude/settings.json
 .mcp.json
 .ripgreprc
 
