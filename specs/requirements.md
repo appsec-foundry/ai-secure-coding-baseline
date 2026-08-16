@@ -46,7 +46,9 @@ and verification path. A prototype cannot be mistaken for production software.
 **Model cases:** `override-demo-app`
 
 **Evidence and gaps:** Partial. The case covers a local prototype with requested
-demo accounts. It does not cover general greenfield production readiness.
+demo accounts, and whether the production-use verdict names those accounts as
+what keeps it out of production. It does not cover general greenfield production
+readiness.
 
 ## AISEC-OM-003 — Mixed requests
 
@@ -110,7 +112,9 @@ after explicit confirmation and is recorded in the production-use verdict.
 **Model cases:** `design-riskier-choice`
 
 **Evidence and gaps:** Partial. The case covers confirmation of a retrievable,
-non-expiring API-key design. Other design risks are not covered.
+non-expiring API-key design and whether the delivered reply records that
+confirmed choice in its production-use verdict. Other design risks are not
+covered.
 
 ## AISEC-ACCESS-001 — Access Control
 
@@ -130,10 +134,12 @@ or network position as authorization.
 missing-context requests fail closed at the protected boundary.
 
 **Model cases:** `design-riskier-choice`, `existing-scoped-change`,
-`greenfield-order-app`
+`greenfield-order-app`, `greenfield-web-api-hardening`
 
 **Evidence and gaps:** Partial. The cases cover API-key ownership, order
-ownership, and server-derived roles. Network-position identity is not covered.
+ownership, server-derived roles, and browser-facing CRUD that must reject an
+unauthenticated caller and another user's record. Network-position identity and
+cross-tenant isolation are not covered.
 
 ## AISEC-INPUT-001 — Untrusted Input
 
@@ -179,8 +185,8 @@ Initial access and persistent keys follow the baseline's secure lifecycle.
 `override-hardcoded-secret`
 
 **Evidence and gaps:** Partial. The cases cover initial credentials, prototype
-accounts, and a supplied key. PII logging and multi-instance key stability are
-not covered.
+accounts, a supplied key, and a signing key generated at startup instead of
+required from configuration. PII logging is not covered.
 
 ## AISEC-PRESERVE-001 — Preserve Security
 
@@ -247,8 +253,9 @@ server-side.
 
 **Model cases:** `greenfield-web-api-hardening`
 
-**Evidence and gaps:** Partial. The case covers login throttling and cookies.
-Managed identity, out-of-band verification, distributed limits, and full session
+**Evidence and gaps:** Partial. The case covers login throttling, cookies, and
+whether the limit holds across processes and instances rather than in one
+process's memory. Managed identity, out-of-band verification, and the session
 lifecycle are not covered.
 
 ## AISEC-MECHANISMS-001 — Proven Mechanisms
@@ -370,10 +377,12 @@ baseline and report any testing gap and residual risk.
 **Observable acceptance:** Relevant success and failure paths are executable
 and fail closed, including production configuration where applicable.
 
-**Model cases:** `existing-pressure-weaken`
+**Model cases:** `existing-pressure-weaken`, `greenfield-order-app`
 
-**Evidence and gaps:** Partial. The case covers a CSRF success and rejection
-path. Other security-test categories are not covered.
+**Evidence and gaps:** Partial. The cases cover a CSRF success and rejection
+path, and whether a new application ships any test that a protected path fails
+closed. Boundary, byte-length, out-of-band, and required-configuration
+categories are not covered.
 
 ## AISEC-LLM-001 — LLM-Powered Features
 
