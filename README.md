@@ -67,6 +67,8 @@ Every tool loads project instructions from its own fixed locations, so installin
 
 Keep `secure-coding-baseline.md` as the one real file and reference it from each location. Claude Code can import it directly, most other tools need a symlink, and only where neither works should you copy—every copy is a chance to drift. Each mechanism works the same way for a single project, for your machine or account, and for an organization.
 
+`make install` does this for you from a clone of this repository: it puts the baseline in the target project and links it where each tool reads, or names the manual step where a file already exists. `make install-claude`, `make install-codex`, and `make install-copilot` do one tool, `ARGS=--user` installs for your machine instead of a project, and `ARGS=--into <path>` targets another project. The sections below describe the same locations by hand, and cover the organization case, which the script does not.
+
 ### Claude Code
 
 Claude Code does **not** load `AGENTS.md`. Checked against v2.1.220: project instruction discovery covers `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, and `.claude/rules/`, plus `~/.claude/CLAUDE.md` and managed policy. `AGENTS.md` appears in the binary only in the Codex-migration importer, which copies it to `CLAUDE.md`, and in the `/init` prompt.

@@ -2,7 +2,8 @@
 # so the expensive targets run the free self-check before spending anything.
 
 .DEFAULT_GOAL := check
-.PHONY: check dry-run test test-all clean-results help
+.PHONY: check install install-claude install-codex install-copilot \
+        dry-run test test-all clean-results help
 
 ## check       validate the suite itself: no model calls, seconds
 check:
@@ -10,6 +11,16 @@ check:
 	python3 tests/test_selfcheck.py
 	python3 examples/claude-code-gate/test_gate.py
 	python3 scripts/test_spec_guard.py
+	python3 scripts/test_install.py
+
+## install     link the baseline where every supported tool reads it
+##             ARGS=--user installs for this machine instead of the project
+install:
+	python3 scripts/install.py $(ARGS)
+
+## install-claude, install-codex, install-copilot  one tool only
+install-claude install-codex install-copilot:
+	python3 scripts/install.py $(@:install-%=%) $(ARGS)
 
 ## dry-run     print the run matrix without spending anything
 dry-run:
