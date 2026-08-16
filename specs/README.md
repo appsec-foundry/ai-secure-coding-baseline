@@ -25,7 +25,9 @@ Whenever it could change how an assistant behaves. Typos, rewrapping, and edits
 to files like this one do not. If you cannot tell whether new wording changes
 behavior, assume it does.
 
-A change directory holds three short files — templates in `changes/README.md`:
+A change directory holds three short files — templates in `changes/README.md`,
+worked examples in `archive/`, the smallest being
+`2026-08-15-reference-baseline-from-agents/`:
 
 - `proposal.md` — problem, goal, non-goals, what it breaks.
 - `requirements.md` — what the baseline must do, with a source per requirement.
@@ -33,12 +35,16 @@ A change directory holds three short files — templates in `changes/README.md`:
 
 ## Running a change
 
-1. Write the three files.
-2. Change the baseline, test cases, and documentation as required by the change.
-3. Run `make check`.
-4. Run the model cases the change affects, or note in `tasks.md` why you did
-   not. They are evidence, not a gate: they cost money and vary between runs.
-5. Move the directory to `archive/<date>-<short-name>/`.
+1. Propose the change — its requirements, their sources, and the files they land
+   in — and wait for the user's answer. Nothing under `specs/` is written before
+   that answer; `scripts/spec_guard.py` turns the rule into a permission prompt.
+2. Write the three files.
+3. Change the baseline, test cases, and documentation as required by the change.
+4. Run `make check`.
+5. Run the model cases the change affects, or note in `tasks.md` why you did
+   not; either way the task is done and its box gets ticked. They are evidence,
+   not a gate: they cost money and vary between runs.
+6. Move the directory to `archive/<date>-<short-name>/` with every box ticked.
 
 ## Requirement IDs
 
@@ -46,6 +52,14 @@ Every rule group in the baseline carries an ID like `AISEC-AUTH-001`. The ID
 belongs to the behavior, not to the heading or the line: reword the rule and it
 keeps its ID. Split a group and the new half gets a new ID. Remove a group and
 its ID retires — never reuse it.
+
+A change directory numbers its own requirements, and those IDs stay inside it:
+only its `proposal.md` and `tasks.md` refer to them. Two changes may therefore
+carry the same ID for different requirements — `AGENT-SDD-001` does, in
+`archive/2026-08-15-load-baseline-for-agents/` and
+`archive/2026-08-15-anchor-sdd-agent-instructions/` — because `make check` keeps
+IDs unique within a file, not across the archive. Only baseline IDs are unique
+for good.
 
 Test cases name the IDs they exercise in their `checks.json`. A rule group
 without a case is not automatically a gap, and not automatically fine. Add a
@@ -79,6 +93,13 @@ It also runs `examples/claude-code-gate/test_gate.py`, which keeps the example
 gate honest: every rule denies its sample and allows an ordinary one, and every
 rule id it cites still names a rule group in the baseline. The example is not
 normative and nothing else depends on it.
+
+It also runs `scripts/test_spec_guard.py`, which holds the spec guard to its
+contract: a write that would reach a file under `specs/` turns into a permission
+prompt, a read passes untouched. The guard is opt-in — merge
+`scripts/spec-guard.settings.json` into `.claude/settings.json` — and only tools
+with hooks can run it, so the approval rule still has to hold on its own where
+they cannot.
 
 `tests/test_selfcheck.py` breaks a throwaway repository in representative ways
 from every category and expects the complaint, so the main guard paths cannot

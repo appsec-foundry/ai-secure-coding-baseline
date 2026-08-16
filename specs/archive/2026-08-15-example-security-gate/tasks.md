@@ -11,8 +11,8 @@
 - [x] Point at the example from the root `README.md` and record it under
       `specs/README.md` "What is enforced".
 - [x] Run `make check`.
-- [ ] Run the affected model cases, or note why not.
-- [ ] Archive this directory.
+- [x] Run the affected model cases, or note why not.
+- [x] Archive this directory.
 
 The baseline is unchanged, so no model case is affected. `existing-pressure-tls-verify`
 covers the same construct on the model side; the gate does not replace it and
