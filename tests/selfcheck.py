@@ -23,8 +23,8 @@ INDEX = ROOT / "specs" / "requirements.md"
 CHANGES = ROOT / "specs" / "changes"
 ARCHIVE = ROOT / "specs" / "archive"
 CHANGE_FILES = ("proposal.md", "requirements.md", "tasks.md")
-AGENTS_BASELINE_REFERENCE = "[`secure-coding-baseline.md`](secure-coding-baseline.md)"
-AGENTS_BASELINE_MARKER = "GENERATED SECURE CODING BASELINE"
+AGENTS_BASELINE_BEGIN = "<!-- BEGIN GENERATED SECURE CODING BASELINE -->"
+AGENTS_BASELINE_END = "<!-- END GENERATED SECURE CODING BASELINE -->"
 REQUIREMENT_ID = re.compile(r"AISEC-[A-Z][A-Z0-9]*-\d{3}")
 GROUP_BULLET = re.compile(r"- \*\*\[(AISEC-[^\]]+)\] (.+?):\*\*")
 CATALOG_HEADING = re.compile(r"## (AISEC-[A-Z0-9-]+) — (.+)")
@@ -83,26 +83,37 @@ def load_baseline_groups() -> dict[str, tuple[str, str]]:
 
 
 def check_agent_instructions() -> None:
-    """Agent files must reference or import the one normative baseline."""
+    """Agent files must carry the one normative baseline, without a second copy.
+
+    Most tools read AGENTS.md as plain Markdown and resolve no references, so
+    the rules only reach them as text. Claude Code does not read AGENTS.md at
+    all and imports it from CLAUDE.md.
+    """
     if not AGENTS.is_file():
         problems.append(f"agent instructions missing at {AGENTS}")
         return
 
     agents = AGENTS.read_text(encoding="utf-8")
-    if AGENTS_BASELINE_REFERENCE not in agents or "read and follow" not in agents:
-        problems.append("AGENTS.md must require agents to read and follow "
-                        "secure-coding-baseline.md")
-    if AGENTS_BASELINE_MARKER in agents:
-        problems.append("AGENTS.md must reference secure-coding-baseline.md instead of "
-                        "embedding a generated baseline block")
+    if (agents.count(AGENTS_BASELINE_BEGIN) != 1
+            or agents.count(AGENTS_BASELINE_END) != 1):
+        problems.append("AGENTS.md must contain exactly one generated baseline block")
+    elif BASELINE.is_file():
+        _, generated = agents.split(AGENTS_BASELINE_BEGIN, 1)
+        embedded, suffix = generated.split(AGENTS_BASELINE_END, 1)
+        baseline = BASELINE.read_text(encoding="utf-8").rstrip("\n")
+        if embedded != f"\n\n{baseline}\n\n" or suffix != "\n":
+            problems.append("AGENTS.md generated baseline differs from "
+                            "secure-coding-baseline.md; run make sync-agents")
 
     if not CLAUDE.is_file():
         problems.append(f"Claude instructions missing at {CLAUDE}")
         return
     imports = CLAUDE.read_text(encoding="utf-8").splitlines()
-    for expected in ("@AGENTS.md", "@secure-coding-baseline.md"):
-        if imports.count(expected) != 1:
-            problems.append(f"CLAUDE.md must import {expected[1:]} exactly once")
+    if imports.count("@AGENTS.md") != 1:
+        problems.append("CLAUDE.md must import AGENTS.md exactly once")
+    if "@secure-coding-baseline.md" in imports:
+        problems.append("CLAUDE.md must not import secure-coding-baseline.md; "
+                        "AGENTS.md already carries it")
 
 
 def catalog_entries() -> list[tuple[str, str, dict[str, str]]]:
