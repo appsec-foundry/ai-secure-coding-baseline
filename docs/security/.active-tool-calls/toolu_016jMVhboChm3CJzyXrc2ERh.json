@@ -1,1 +1,0 @@
-{"tool_use_id": "toolu_016jMVhboChm3CJzyXrc2ERh", "session_id": "813920da", "agent": "", "tool": "Bash", "started_at": 1785649325, "input_summary": "python3 /home/mrohr/appsec-advisor/scripts/install_baseline.py --scope user --repo /home/mrohr/ai-secure-coding-baseline"}

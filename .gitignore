@@ -13,6 +13,8 @@
 
 # Assistant / tooling config
 .claude/*
+# appsec-advisor plugin runtime state (session logs, budget, open tool calls)
+docs/security/
 # except the project settings that install scripts/spec_guard.py
 !.claude/settings.json
 .mcp.json

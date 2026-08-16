@@ -1,8 +1,0 @@
-2026-08-02T05:41:27Z  [813920da]  INFO   BASH_OK             cmd=echo "CLAUDE_PLUGIN_ROOT: $CLAUDE_PLUGIN_ROOT" && find /home/mrohr/appsec-adviso…  dur=1s
-2026-08-02T05:41:29Z  [813920da]  INFO   BASH_OK             cmd=python3 /home/mrohr/appsec-advisor/scripts/baseline_check.py --repo /home/mrohr/…  dur=0s
-2026-08-02T05:42:00Z  [813920da]  INFO   BASH_OK             cmd=python3 /home/mrohr/appsec-advisor/scripts/install_baseline.py --scope user --re…  dur=15s
-2026-08-02T05:44:21Z  [813920da]  INFO   BASH_OK             cmd=python3 /home/mrohr/appsec-advisor/scripts/install_baseline.py --scope user --re…  dur=104s
-2026-08-02T05:44:25Z  [813920da]  INFO   SESSION_STOP        stop_reason=tool_use  in=24  out=6,518  cache_write=128,034  cache_read=584,750  cost=$0.7534
-2026-08-02T05:44:25Z  [813920da]  INFO   ASSESSMENT_SUMMARY  mode=full  duration=2m 58s  plugin_version=0.5.2-dev  analysis_version=5  threats=0 (Critical=0, High=0, Medium=0, Low=0)
-2026-08-02T05:44:25Z  [813920da]  INFO   ASSESSMENT_TOKENS   throughput=719,326  input=712,808  output=6,518  (input split: fresh=24 cache_write=128,034 cache_read=584,750)  cost=$0.7534  billing=subscription
-2026-08-02T05:44:25Z  [813920da]  INFO   ASSESSMENT_MODELS   agents: none detected
