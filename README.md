@@ -43,9 +43,9 @@ This is a compact guardrail, not a complete standard or compliance checklist. It
 
 ## The rules
 
-[secure-coding-baseline.md](secure-coding-baseline.md) is the complete text. Four
-groups are marked non-negotiable, and each of them names a mechanism rather than
-a goal:
+[secure-coding-baseline.md](secure-coding-baseline.md) is the complete text.
+Every group names a mechanism rather than a goal. Four are marked
+non-negotiable:
 
 - `AISEC-ACCESS-001` — authenticate and authorize on the server for every
   protected action, and bind the authenticated identity to the requested
@@ -61,11 +61,28 @@ a goal:
 - `AISEC-PRESERVE-001` — never weaken a control to make code work or a test
   pass. A control that can be switched off is weakened, flag or not.
 
-The other groups cover secure defaults and transport, authentication abuse
-resistance, proven mechanisms and cryptography, dependencies, errors and
-logging, resource limits, production versus development, security tests, and
-LLM-powered features. [`specs/requirements.md`](specs/requirements.md) says when
-each group applies and what it expects.
+Nine more apply where a change touches them:
+
+- `AISEC-DEFAULTS-001` — least privilege, deny by default, TLS for anything that
+  leaves the machine, and the browser headers that go with it.
+- `AISEC-AUTH-001` — rate limits on login and password reset, per account and per
+  source, in a store more than one process can see.
+- `AISEC-MECHANISMS-001` — no hand-rolled crypto, authentication, or sessions.
+- `AISEC-DEPS-001` — check a new package against a current source before
+  installing it, not against the model's confidence that it exists.
+- `AISEC-ERRORS-001` — no stack trace to the caller, no credential in the log.
+- `AISEC-LIMITS-001` — timeouts and size caps on anything an input can drive.
+- `AISEC-ENV-001` — debug modes and seed data stay out of production, and an off
+  switch for authentication belongs nowhere.
+- `AISEC-TESTS-001` — a change to a control brings the abuse case with it, not
+  just the passing one.
+- `AISEC-LLM-001` — model output and retrieved content are input, never
+  instructions.
+
+`AISEC-OM-001` to `-005` and `AISEC-REPORT-001` cover the procedure instead of
+the code; the next section describes them.
+[`specs/requirements.md`](specs/requirements.md) says when each group applies and
+what it expects.
 
 ## What the assistant does with them
 
@@ -85,7 +102,9 @@ alternative.
 
 It reports what it delivered. Problems found in scope are named with location
 and impact, fixed or not. Where a change moves what a control covers or what is
-reachable, the reply ends with a security note:
+reachable, the reply ends with a security note in four fixed parts: whether the
+result can go to production, what the change relies on, what it leaves out, and
+what nobody verified:
 
 > **Production use:** No. Supply `ADMIN_PASSWORD` through the environment,
 > which startup now requires, and terminate TLS before the service leaves
@@ -99,6 +118,8 @@ reachable, the reply ends with a security note:
 >
 > **Unverified:** The service was not started, so the response headers are
 > configured but unexecuted.
+
+Where nothing moved, there is no note at all.
 
 ## Using it
 
