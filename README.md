@@ -183,13 +183,6 @@ instruction locations:
 - **Organization:** deploy it as a managed-policy `CLAUDE.md`. See the
   [organization setup](https://code.claude.com/docs/en/admin-setup).
 
-This repository's tracked spec-workflow hook in `.claude/settings.json` is
-loaded only when Claude Code starts from the repository root; project settings
-are not inherited from a parent when a session starts in a subdirectory. Its
-native edit rule and command hook reinforce the workflow, but a command hook
-that cannot start or times out produces no decision and falls back to Claude
-Code's normal permission flow.
-
 ### GitHub Copilot
 
 Copilot's coding agent and VS Code support `AGENTS.md`. For other Copilot
@@ -323,6 +316,9 @@ Behavior changes need a proposal, sourced requirements, and a task list under
 [`specs/changes/`](specs/changes/). Editorial changes do not. See
 [`specs/README.md`](specs/README.md) for the workflow. Run `make check` after
 changing the baseline, specifications, or tests.
+
+When changing specifications with Claude Code, start it from the repository
+root so the tracked approval hook is loaded.
 
 ## License
 
