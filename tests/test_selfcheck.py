@@ -18,6 +18,8 @@ HERE = Path(__file__).resolve().parent
 BASELINE = """\
 # Demo baseline
 
+`baseline-id: aisec-0.1.0`
+
 ## Non-negotiable
 
 - **[AISEC-DEMO-001] First rule:** Do the safe thing.
@@ -92,12 +94,21 @@ Before doing any repository work, read and follow
 [`secure-coding-baseline.md`](secure-coding-baseline.md); it is normative.
 """
 
+README = """\
+# Demo baseline
+
+Ask the tool `baseline?`. The answer should include `aisec-0.1.0`.
+
+- `aisec-0.1.0`: this baseline.
+"""
+
 
 def build(root: Path) -> None:
     """A miniature of this repository: baseline, catalog, one case, the guard."""
     (root / "specs").mkdir()
     (root / "tests" / "cases" / "demo-case").mkdir(parents=True)
     (root / "secure-coding-baseline.md").write_text(BASELINE)
+    (root / "README.md").write_text(README)
     (root / "AGENTS.md").write_text(AGENTS)
     (root / "CLAUDE.md").write_text("@AGENTS.md\n@secure-coding-baseline.md\n")
     (root / "specs" / "requirements.md").write_text(CATALOG)
@@ -131,6 +142,13 @@ def add_failing_precondition(root: Path) -> None:
 # what selfcheck must say; None means it must stay silent and pass.
 CASES = [
     ("intact repository", lambda r: None, None),
+    ("baseline id is not SemVer",
+     lambda r: edit(r / "secure-coding-baseline.md", "aisec-0.1.0", "aisec-0.1"),
+     "does not use Semantic Versioning"),
+    ("README current baseline id is stale",
+     lambda r: edit(r / "README.md", "- `aisec-0.1.0`: this baseline.",
+                    "- `aisec-0.1.1`: this baseline."),
+     "README current baseline id 'aisec-0.1.1' does not match"),
     ("agent baseline reference is missing",
      lambda r: (r / "AGENTS.md").write_text("# Repository instructions\n"),
      "AGENTS.md must require agents to read and follow"),

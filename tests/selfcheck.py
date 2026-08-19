@@ -17,6 +17,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 CASES = HERE / "cases"
 BASELINE = ROOT / "secure-coding-baseline.md"
+README = ROOT / "README.md"
 AGENTS = ROOT / "AGENTS.md"
 CLAUDE = ROOT / "CLAUDE.md"
 INDEX = ROOT / "specs" / "requirements.md"
@@ -34,6 +35,19 @@ CATALOG_FIELDS = (
     "Observable acceptance", "Model cases", "Evidence and gaps",
 )
 CHANGE_REQUIREMENT = re.compile(r"([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{3}) (.+)")
+NUMERIC_IDENTIFIER = r"(?:0|[1-9][0-9]*)"
+PRERELEASE_IDENTIFIER = (
+    rf"(?:{NUMERIC_IDENTIFIER}|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)"
+)
+SEMVER = (
+    rf"{NUMERIC_IDENTIFIER}\.{NUMERIC_IDENTIFIER}\.{NUMERIC_IDENTIFIER}"
+    rf"(?:-{PRERELEASE_IDENTIFIER}(?:\.{PRERELEASE_IDENTIFIER})*)?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+)
+BASELINE_IDENTIFIER = re.compile(rf"[a-z][a-z0-9]*(?:-[a-z0-9]+)*-{SEMVER}")
+BASELINE_ID_LINE = re.compile(r"^`baseline-id: ([^`]+)`")
+README_VERIFY_ID = re.compile(r"answer should include `([^`]+)`")
+README_CURRENT_ID = re.compile(r"^- `([^`]+)`: this baseline\.$", re.MULTILINE)
 
 REGEX_KEYS = ["forbidden_regex", "required_regex",
               "reply_forbidden_regex", "reply_required_regex"]
@@ -80,6 +94,34 @@ def load_baseline_groups() -> dict[str, tuple[str, str]]:
     if not groups:
         problems.append("baseline has no requirement ids")
     return groups
+
+
+def check_baseline_identifier() -> None:
+    """The normative and documented IDs must name one SemVer revision."""
+    if not BASELINE.is_file():
+        return
+
+    identifiers = [match.group(1) for line in BASELINE.read_text(encoding="utf-8").splitlines()
+                   if (match := BASELINE_ID_LINE.match(line))]
+    if len(identifiers) != 1:
+        problems.append("baseline must declare exactly one baseline id")
+        return
+    identifier = identifiers[0]
+    if not BASELINE_IDENTIFIER.fullmatch(identifier):
+        problems.append(f"baseline id {identifier!r} does not use Semantic Versioning")
+
+    if not README.is_file():
+        problems.append(f"README missing at {README}")
+        return
+    readme = README.read_text(encoding="utf-8")
+    for label, pattern in (("verification", README_VERIFY_ID),
+                           ("current baseline", README_CURRENT_ID)):
+        documented = pattern.findall(readme)
+        if len(documented) != 1:
+            problems.append(f"README must document exactly one {label} id")
+        elif documented[0] != identifier:
+            problems.append(f"README {label} id {documented[0]!r} does not match "
+                            f"baseline id {identifier!r}")
 
 
 def check_agent_instructions() -> None:
@@ -467,6 +509,7 @@ def run_fixture_precondition(name: str, d: Path, checks: dict) -> None:
 def main() -> int:
     groups = load_baseline_groups()
     baseline_ids = set(groups)
+    check_baseline_identifier()
     check_agent_instructions()
 
     try:

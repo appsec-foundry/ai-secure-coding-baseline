@@ -259,20 +259,28 @@ This is a reference, not an automatic import.
 
 ### Verify it loaded
 
-Ask the tool `baseline?`. The answer should include `aisec-0.1` and the file it
+Ask the tool `baseline?`. The answer should include `aisec-0.1.0` and the file it
 came from. This checks that the assistant can see the baseline, not that it was
 loaded before the question or will be followed. For behavior, see
 [Testing the baseline](#testing-the-baseline).
 
-Baseline IDs use this format:
+The version component of a baseline ID follows
+[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html):
 
 ```
-<name>-<version>[+<derivative>]
+<name>-<major>.<minor>.<patch>[-<prerelease>][+<metadata>]
 ```
 
-- `aisec-0.1`: this baseline.
-- `aisec-0.1+acme`: a derived version.
-- `acme-sec-1.0`: an independent baseline.
+- `aisec-0.1.0`: this baseline.
+- `aisec-0.1.0+acme`: a derived version.
+- `acme-sec-1.0.0`: an independent baseline.
+
+Every change to the normative baseline text increases the version by at least
+a patch. While the baseline is in `0.x` beta, adding, removing, or materially
+changing rule behavior increases the minor version. After `1.0.0`, incompatible
+changes increase the major version and backward-compatible behavior additions
+increase the minor version. Repository-only changes do not change the baseline
+version.
 
 The assistant reports every loaded ID. Claude Code users can also check loaded
 files with `/context` or `/memory`.
@@ -281,7 +289,7 @@ files with `/context` or `/memory`.
 
 Add stack-specific details such as approved libraries, framework patterns, or
 review steps. Keep existing rule-group IDs, but change the baseline ID, for
-example to `aisec-0.1+acme`, so `baseline?` identifies the derived version.
+example to `aisec-0.1.0+acme`, so `baseline?` identifies the derived version.
 
 Keep application-specific security requirements separate. The baseline governs
 assistant behavior. Tests, CI checks, review gates, and runtime controls enforce
