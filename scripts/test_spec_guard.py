@@ -8,12 +8,14 @@ checks that Claude Code project settings actually register the tested script.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 GUARD = Path(__file__).resolve().parent / "spec_guard.py"
 REPO = GUARD.parent.parent
+SPECS = REPO / "specs"
 PROJECT_SETTINGS = REPO / ".claude/settings.json"
 
 ASK = [
@@ -138,17 +140,43 @@ BLOCK = [
     ("missing Write path",
      json.dumps({"hook_event_name": "PreToolUse", "cwd": str(REPO),
                  "tool_name": "Write", "tool_input": {"content": "x"}})),
+    ("missing cwd",
+     json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Write",
+                 "tool_input": {"file_path": "specs/x.md", "content": "x"}})),
+    ("relative cwd",
+     json.dumps({"hook_event_name": "PreToolUse", "cwd": ".",
+                 "tool_name": "Write",
+                 "tool_input": {"file_path": "specs/x.md", "content": "x"}})),
+]
+
+CONFIG_BLOCK = [
+    ("missing protected directory", []),
+    ("relative protected directory", ["--protected-dir", "specs"]),
+    ("filesystem root", ["--protected-dir", "/"]),
+    ("non-directory target", ["--protected-dir", str(PROJECT_SETTINGS)]),
 ]
 
 
-def invoke(raw: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([sys.executable, str(GUARD)], input=raw,
-                          capture_output=True, text=True, timeout=20)
+def invoke(raw: str,
+           guard_args: list[str] | None = None,
+           include_project_dir: bool = True) -> subprocess.CompletedProcess[str]:
+    if guard_args is None:
+        guard_args = ["--protected-dir", str(SPECS)]
+    env = dict(os.environ)
+    if include_project_dir:
+        env["CLAUDE_PROJECT_DIR"] = str(REPO)
+    else:
+        env.pop("CLAUDE_PROJECT_DIR", None)
+    return subprocess.run([sys.executable, str(GUARD), *guard_args], input=raw,
+                          capture_output=True, text=True, timeout=20, env=env)
 
 
-def run(payload: dict) -> dict | None:
+def run(payload: dict, protected_dir: Path = SPECS) -> dict | None:
     payload = {"hook_event_name": "PreToolUse", "cwd": str(REPO), **payload}
-    proc = invoke(json.dumps(payload))
+    proc = invoke(
+        json.dumps(payload),
+        ["--protected-dir", str(protected_dir)],
+    )
     if proc.returncode != 0:
         raise AssertionError(f"guard exited {proc.returncode}: {proc.stderr[:300]}")
     out = proc.stdout.strip()
@@ -182,7 +210,11 @@ def check_registration(failures: list[str]) -> None:
         failures.append("project hook does not cover the maintained tool set")
     if "if" in handler:
         failures.append("project hook must remain unfiltered")
-    expected_args = ["${CLAUDE_PROJECT_DIR}/scripts/spec_guard.py"]
+    expected_args = [
+        "${CLAUDE_PROJECT_DIR}/scripts/spec_guard.py",
+        "--protected-dir",
+        "${CLAUDE_PROJECT_DIR}/specs",
+    ]
     if handler.get("type") != "command" or handler.get("command") != "python3":
         failures.append("project hook does not invoke the guard with python3")
     if handler.get("args") != expected_args:
@@ -212,13 +244,86 @@ def main() -> int:
                 f"{label}: expected blocking exit 2, got {proc.returncode} / {proc.stderr!r}"
             )
 
+    valid_raw = json.dumps({
+        "hook_event_name": "PreToolUse",
+        "cwd": str(REPO),
+        "tool_name": "Write",
+        "tool_input": {"file_path": "specs/x.md", "content": "x"},
+    })
+    for label, guard_args in CONFIG_BLOCK:
+        proc = invoke(valid_raw, guard_args)
+        if proc.returncode != 2 or "blocking" not in proc.stderr:
+            failures.append(
+                f"{label}: expected blocking exit 2, got "
+                f"{proc.returncode} / {proc.stderr!r}"
+            )
+
+    alternate = REPO / "tests"
+    alternate_decision = run(
+        {"tool_name": "Bash",
+         "tool_input": {"command": "echo x > tests/result.txt"}},
+        alternate,
+    )
+    alternate_got = (alternate_decision or {}).get(
+        "hookSpecificOutput", {}
+    ).get("permissionDecision")
+    if alternate_got != "ask":
+        failures.append(
+            "configured alternate directory: "
+            f"expected ask, got {alternate_got!r}"
+        )
+    unrelated_decision = run(
+        {"tool_name": "Write",
+         "tool_input": {"file_path": "specs/result.txt", "content": "x"}},
+        alternate,
+    )
+    if unrelated_decision is not None:
+        failures.append(
+            "configured alternate directory: hard-coded specs path still matched"
+        )
+
+    root_spellings = (
+        "${CLAUDE_PROJECT_DIR}",
+        "$CLAUDE_PROJECT_DIR",
+        "%CLAUDE_PROJECT_DIR%",
+        "${env:CLAUDE_PROJECT_DIR}",
+        "$env:CLAUDE_PROJECT_DIR",
+    )
+    for spelling in root_spellings:
+        decision = run({
+            "tool_name": "Bash",
+            "tool_input": {"command": f'echo x > "{spelling}/specs/x.md"'},
+        })
+        got = (decision or {}).get(
+            "hookSpecificOutput", {}
+        ).get("permissionDecision")
+        if got != "ask":
+            failures.append(
+                f"project root spelling {spelling!r}: expected ask, got {got!r}"
+            )
+
+    missing_root_raw = json.dumps({
+        "hook_event_name": "PreToolUse",
+        "cwd": str(REPO),
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": "echo x > $CLAUDE_PROJECT_DIR/specs/x.md",
+        },
+    })
+    missing_root = invoke(missing_root_raw, include_project_dir=False)
+    if missing_root.returncode != 2 or "blocking" not in missing_root.stderr:
+        failures.append(
+            "missing CLAUDE_PROJECT_DIR: expected blocking exit 2, got "
+            f"{missing_root.returncode} / {missing_root.stderr!r}"
+        )
+
     for line in failures:
         print(f"FAIL: {line}")
     if failures:
         return 1
     print(
         f"spec guard: ok (registered, {len(ASK)} asked, "
-        f"{len(ALLOW)} allowed, {len(BLOCK)} blocked)"
+        f"{len(ALLOW)} allowed, {len(BLOCK) + len(CONFIG_BLOCK)} blocked)"
     )
     return 0
 

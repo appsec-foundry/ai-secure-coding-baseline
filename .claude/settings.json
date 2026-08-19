@@ -13,7 +13,9 @@
             "type": "command",
             "command": "python3",
             "args": [
-              "${CLAUDE_PROJECT_DIR}/scripts/spec_guard.py"
+              "${CLAUDE_PROJECT_DIR}/scripts/spec_guard.py",
+              "--protected-dir",
+              "${CLAUDE_PROJECT_DIR}/specs"
             ],
             "timeout": 10
           }
