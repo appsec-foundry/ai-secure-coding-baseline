@@ -123,21 +123,35 @@ def check_registration(failures: list[str]) -> None:
         failures.append("project settings do not contain the maintained hook snippet")
         return
     try:
-        group = project["hooks"]["PreToolUse"][0]
-        handler = group["hooks"][0]
-    except (KeyError, IndexError, TypeError):
-        failures.append("project settings do not register a PreToolUse command hook")
+        groups = project["hooks"]["PreToolUse"]
+        write_group = next(group for group in groups if group.get("matcher") == "Write")
+        fallback_group = next(
+            group for group in groups if group.get("matcher") != "Write"
+        )
+        write_handler = write_group["hooks"][0]
+        fallback_handler = fallback_group["hooks"][0]
+    except (KeyError, IndexError, StopIteration, TypeError):
+        failures.append("project settings do not register the split PreToolUse hooks")
         return
-    required_tools = {
-        "Bash", "Edit", "MultiEdit", "NotebookEdit", "PowerShell", "Write", "mcp__.*",
+    if len(groups) != 2:
+        failures.append("project settings must contain exactly two spec guard groups")
+    if write_handler.get("if") != "Write(/specs/**)":
+        failures.append("project Write hook is not filtered from the project root")
+    fallback_tools = {
+        "Bash", "Edit", "MultiEdit", "NotebookEdit", "PowerShell", "mcp__.*",
     }
-    if set(group.get("matcher", "").split("|")) != required_tools:
-        failures.append("project hook matcher does not cover the maintained tool set")
+    if set(fallback_group.get("matcher", "").split("|")) != fallback_tools:
+        failures.append("project fallback hook does not cover the maintained tool set")
+    if "if" in fallback_handler:
+        failures.append("project fallback hook must remain unfiltered")
     expected_args = ["${CLAUDE_PROJECT_DIR}/scripts/spec_guard.py"]
-    if handler.get("type") != "command" or handler.get("command") != "python3":
-        failures.append("project hook does not invoke the guard with python3")
-    if handler.get("args") != expected_args:
-        failures.append("project hook does not resolve the guard from the project root")
+    for label, handler in (("Write", write_handler), ("fallback", fallback_handler)):
+        if handler.get("type") != "command" or handler.get("command") != "python3":
+            failures.append(f"project {label} hook does not invoke the guard with python3")
+        if handler.get("args") != expected_args:
+            failures.append(
+                f"project {label} hook does not resolve the guard from the project root"
+            )
 
 
 def main() -> int:
