@@ -98,9 +98,8 @@ normative and nothing else depends on it.
 It also runs `scripts/test_spec_guard.py`, which holds the spec guard to its
 contract and verifies its project registration: an identifiable write that
 targets a file under `specs/` turns into a permission prompt, while a read
-passes untouched. `.claude/settings.json` loads the guard for Claude Code and
-`scripts/spec-guard.settings.json` carries the same hook for merging elsewhere.
-The shell arm can inspect only the command and paths Claude supplies; it cannot
+passes untouched. `.claude/settings.json` loads the guard for Claude Code. The
+shell arm can inspect only the command and paths Claude supplies; it cannot
 infer a hidden write performed by an otherwise opaque program. Only tools with
 hooks can run the guard, so the approval rule still holds on its own where the
 hook cannot establish the effect.

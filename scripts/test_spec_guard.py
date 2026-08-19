@@ -15,7 +15,6 @@ from pathlib import Path
 GUARD = Path(__file__).resolve().parent / "spec_guard.py"
 REPO = GUARD.parent.parent
 PROJECT_SETTINGS = REPO / ".claude/settings.json"
-SETTINGS_SNIPPET = GUARD.parent / "spec-guard.settings.json"
 
 ASK = [
     ("Write into the catalog",
@@ -115,12 +114,8 @@ def check_registration(failures: list[str]) -> None:
     """The tested hook must be the hook Claude Code loads for this project."""
     try:
         project = json.loads(PROJECT_SETTINGS.read_text())
-        snippet = json.loads(SETTINGS_SNIPPET.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         failures.append(f"project hook registration is unreadable: {exc}")
-        return
-    if project.get("hooks") != snippet.get("hooks"):
-        failures.append("project settings do not contain the maintained hook snippet")
         return
     try:
         groups = project["hooks"]["PreToolUse"]
