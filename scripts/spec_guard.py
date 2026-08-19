@@ -9,8 +9,9 @@ shell write, or recognizable MCP file mutation into a permission prompt.
 Scope
 -----
 Only this repository's `specs/` directory, resolved from this file's location.
-Reading a spec is untouched -- the guard exists to keep changes from happening
-silently, not to make the catalog harder to consult.
+Native reads and recognized read-only shell calls are untouched. Conservative
+writer checks can still ask when a spec path is only a source; the guard favors
+an extra prompt over silently missing a mutation.
 
 Enforcement boundary
 --------------------
@@ -21,6 +22,9 @@ input fields. No pre-tool hook can infer that an otherwise opaque program or
 script writes `specs/` when neither its name nor arguments reveal that effect.
 The instruction and diff review remain authoritative for that case; prompting
 on every shell command would obscure the approval the prompt is meant to record.
+If the command hook cannot start or reaches its timeout, Claude Code renders no
+hook decision; the native edit ask rule still covers built-in file tools, while
+other tools fall back to their normal permission flow.
 
 Contract
 --------
@@ -59,9 +63,12 @@ SHELL_WRITES = re.compile(
     | \b sponge \b
     | \b sed \b [^\n|]* -i
     | \b dd \b [^\n|;&]* \b of \s* =
-    | \b (?: rm | mv | cp | install | truncate | touch | mkdir | ln ) \b
+    | \b (?: rm | mv | cp | install | truncate | touch | mkdir | ln | chmod ) \b
     | \b (?: rsync | unzip ) \b
-    | \b git \s+ (?: checkout | restore | apply | rm | mv | clean ) \b
+    | \b git \s+ (?: checkout | restore | apply | rm | mv | clean | clone ) \b
+    | \b curl \b [^\n|;&]* \s (?: -o | --output ) \b
+    | \b tar \b [^\n|;&]* \s (?: -[A-Za-z]*x[A-Za-z]* | --extract ) \b
+    | \b find \b [^\n|;&]* \s -delete \b
     | \b (?: python3? | perl | ruby | node ) \b [^\n]* \s (?: -c | -e ) \s
     """,
     re.VERBOSE,
@@ -73,6 +80,7 @@ POWERSHELL_WRITES = re.compile(
         Add-Content | Clear-Content | Copy-Item | Move-Item | New-Item |
         Out-File | Remove-Item | Rename-Item | Set-Content | Tee-Object
       ) \b
+    | \b Invoke-WebRequest \b [^\n|;]* (?<! \w ) -OutFile \b
     """,
     re.IGNORECASE | re.VERBOSE,
 )
@@ -83,7 +91,7 @@ PATH_REFERENCE = re.compile(
 )
 
 MCP_MUTATION = re.compile(
-    r"(?:^|_)(?:apply|copy|create|delete|edit|mkdir|move|patch|remove|rename|"
+    r"(?:^|_)(?:append|apply|copy|create|delete|edit|mkdir|move|patch|remove|rename|"
     r"save|touch|truncate|update|upload|write)(?:_|$)",
     re.IGNORECASE,
 )

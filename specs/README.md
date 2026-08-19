@@ -97,12 +97,16 @@ normative and nothing else depends on it.
 
 It also runs `scripts/test_spec_guard.py`, which holds the spec guard to its
 contract and verifies its project registration: an identifiable write that
-targets a file under `specs/` turns into a permission prompt, while a read
-passes untouched. `.claude/settings.json` loads the guard for Claude Code. The
-shell arm can inspect only the command and paths Claude supplies; it cannot
-infer a hidden write performed by an otherwise opaque program. Only tools with
-hooks can run the guard, so the approval rule still holds on its own where the
-hook cannot establish the effect.
+targets a file under `specs/` turns into a permission prompt, while recognized
+read-only calls pass untouched. Conservative writer checks may still ask when
+a spec is only a source. `.claude/settings.json` adds a native edit ask rule and
+loads the guard when Claude Code starts from the repository root; a session
+started in a subdirectory does not inherit that project hook. A command hook
+that cannot start or reaches its timeout produces no decision and falls back to
+the normal permission flow. The shell arm can inspect only the command and
+paths Claude supplies; it cannot infer a hidden write performed by an otherwise
+opaque program. Only tools with hooks can run the guard, so the approval rule
+still holds on its own where the hook cannot establish the effect.
 
 `tests/test_selfcheck.py` breaks a throwaway repository in representative ways
 from every category and expects the complaint, so the main guard paths cannot

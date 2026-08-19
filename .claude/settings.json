@@ -1,4 +1,9 @@
 {
+  "permissions": {
+    "ask": [
+      "Edit(/specs/**)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

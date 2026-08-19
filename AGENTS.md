@@ -39,7 +39,11 @@ Two rules hold no matter how small the change looks:
   wait for an answer. Reading the specs, and pointing out that one is wrong or
   missing, needs no approval. `scripts/spec_guard.py` turns that sentence into a
   permission prompt for identifiable writes from tools that support hooks.
-  `.claude/settings.json` registers it for Claude Code.
+  `.claude/settings.json` registers it for Claude Code when Claude Code is
+  launched from the repository root; a session launched below the root does not
+  inherit that project hook. A command hook that cannot start or times out
+  produces no decision, so the instruction remains authoritative where the
+  hook or its normal permission fallback cannot establish the effect.
 
 Run `make check` after changing the baseline, the specs, test metadata, or the
 harness. It calls no model, takes seconds, and also holds this file to its own

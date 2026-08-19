@@ -43,12 +43,35 @@ ASK = [
      {"tool_name": "Bash", "tool_input": {"command": "printf x | dd of=specs/x.md"}}),
     ("stderr redirect",
      {"tool_name": "Bash", "tool_input": {"command": "command 2> specs/error.log"}}),
+    ("curl output",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "curl -o specs/download.md https://example.invalid/file"}}),
+    ("tar extraction",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "tar -xf /tmp/archive.tar -C specs"}}),
+    ("find deletion",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "find specs -type f -delete"}}),
+    ("chmod mutation",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "chmod 600 specs/requirements.md"}}),
+    ("git clone destination",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "git clone https://example.invalid/repo specs/vendor"}}),
     ("PowerShell write",
      {"tool_name": "PowerShell",
       "tool_input": {"command": "Set-Content -Path specs/x.md -Value x"}}),
+    ("PowerShell web output",
+     {"tool_name": "PowerShell",
+      "tool_input": {
+          "command": "Invoke-WebRequest https://example.invalid -OutFile specs/download.md"
+      }}),
     ("MCP filesystem write",
      {"tool_name": "mcp__filesystem__write_file",
       "tool_input": {"path": "specs/x.md", "content": "x"}}),
+    ("MCP filesystem append",
+     {"tool_name": "mcp__filesystem__append_file",
+      "tool_input": {"path": "specs/requirements.md", "content": "x"}}),
 ]
 
 ALLOW = [
@@ -69,6 +92,20 @@ ALLOW = [
      {"tool_name": "Bash", "tool_input": {"command": "git diff -- specs/"}}),
     ("a write somewhere else",
      {"tool_name": "Bash", "tool_input": {"command": "echo x > tests/results/run.json"}}),
+    ("curl output elsewhere",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "curl -o /tmp/download.md https://example.invalid/file"}}),
+    ("tar extraction elsewhere",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "tar -xf /tmp/archive.tar -C /tmp/unpack"}}),
+    ("find deletion elsewhere",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "find /tmp/unpack -type f -delete"}}),
+    ("chmod elsewhere",
+     {"tool_name": "Bash", "tool_input": {"command": "chmod 600 /tmp/result.md"}}),
+    ("git clone elsewhere",
+     {"tool_name": "Bash",
+      "tool_input": {"command": "git clone https://example.invalid/repo /tmp/vendor"}}),
     ("a specs directory elsewhere",
      {"cwd": "/tmp/other-project", "tool_name": "Bash",
       "tool_input": {"command": "echo x > specs/result.md"}}),
@@ -76,12 +113,20 @@ ALLOW = [
      {"tool_name": "Read", "tool_input": {"file_path": "specs/requirements.md"}}),
     ("PowerShell read",
      {"tool_name": "PowerShell", "tool_input": {"command": "Get-Content specs/requirements.md"}}),
+    ("PowerShell web output elsewhere",
+     {"tool_name": "PowerShell",
+      "tool_input": {
+          "command": "Invoke-WebRequest https://example.invalid -OutFile /tmp/download.md"
+      }}),
     ("MCP filesystem read",
      {"tool_name": "mcp__filesystem__read_file",
       "tool_input": {"path": "specs/requirements.md"}}),
     ("MCP write elsewhere",
      {"tool_name": "mcp__filesystem__write_file",
       "tool_input": {"path": "tests/result.txt", "content": "see specs/x.md"}}),
+    ("MCP append elsewhere",
+     {"tool_name": "mcp__filesystem__append_file",
+      "tool_input": {"path": "tests/result.txt", "content": "x"}}),
 ]
 
 BLOCK = [
@@ -117,6 +162,9 @@ def check_registration(failures: list[str]) -> None:
     except (OSError, json.JSONDecodeError) as exc:
         failures.append(f"project hook registration is unreadable: {exc}")
         return
+    ask_rules = project.get("permissions", {}).get("ask", [])
+    if not isinstance(ask_rules, list) or "Edit(/specs/**)" not in ask_rules:
+        failures.append("project permissions do not ask on built-in spec edits")
     try:
         groups = project["hooks"]["PreToolUse"]
         write_group = next(group for group in groups if group.get("matcher") == "Write")
