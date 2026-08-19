@@ -22,11 +22,14 @@ Four limits from it bind every edit to the baseline text:
   the application being built, and application-specific requirements do not
   belong in it.
 
-Use specification-driven development for every change that could alter how an
-assistant behaves. Read [`specs/README.md`](specs/README.md) before changing the
-baseline, a test case, or the workflow—it describes how changes run here.
+Use specification-driven development for every change to
+`secure-coding-baseline.md` that could alter how an assistant behaves. Read
+[`specs/README.md`](specs/README.md) before changing the baseline—it describes
+how baseline changes run here. Changes limited to repository tooling,
+configuration, workflow, documentation, the harness, or tests do not get a
+change specification when the normative baseline stays unchanged.
 
-Two rules hold no matter how small the change looks:
+Three rules hold no matter how small the baseline change looks:
 
 - Requirements come only from an explicit user request, existing repository
   documentation, or commit history that clearly establishes the behavior. Name

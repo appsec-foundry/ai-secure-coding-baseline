@@ -21,9 +21,12 @@ make a sourced rule easier to see; it must not add to it.
 
 ## When a change needs its own directory
 
-Whenever it could change how an assistant behaves. Typos, rewrapping, and edits
-to files like this one do not. If you cannot tell whether new wording changes
-behavior, assume it does.
+A change needs its own directory only when it changes
+`secure-coding-baseline.md` in a way that could alter how an assistant behaves.
+Repository tooling, configuration, workflow, documentation, harness, and
+test-only changes do not get a change directory while the normative baseline
+stays unchanged. Typos and rewrapping do not need one either. If you cannot tell
+whether new baseline wording changes behavior, assume it does.
 
 A change directory holds three short files — templates in `changes/README.md`,
 worked examples in `archive/`, the smallest being
