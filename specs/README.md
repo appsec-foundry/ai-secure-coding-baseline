@@ -37,7 +37,8 @@ worked examples in `archive/`, the smallest being
 
 1. Propose the change — its requirements, their sources, and the files they land
    in — and wait for the user's answer. Nothing under `specs/` is written before
-   that answer; `scripts/spec_guard.py` turns the rule into a permission prompt.
+   that answer; `scripts/spec_guard.py` turns identifiable writes into a
+   permission prompt.
 2. Write the three files.
 3. Change the baseline, test cases, and documentation as required by the change.
 4. Run `make check`.
@@ -95,11 +96,14 @@ rule id it cites still names a rule group in the baseline. The example is not
 normative and nothing else depends on it.
 
 It also runs `scripts/test_spec_guard.py`, which holds the spec guard to its
-contract: a write that would reach a file under `specs/` turns into a permission
-prompt, a read passes untouched. The guard is opt-in — merge
-`scripts/spec-guard.settings.json` into `.claude/settings.json` — and only tools
-with hooks can run it, so the approval rule still has to hold on its own where
-they cannot.
+contract and verifies its project registration: an identifiable write that
+targets a file under `specs/` turns into a permission prompt, while a read
+passes untouched. `.claude/settings.json` loads the guard for Claude Code and
+`scripts/spec-guard.settings.json` carries the same hook for merging elsewhere.
+The shell arm can inspect only the command and paths Claude supplies; it cannot
+infer a hidden write performed by an otherwise opaque program. Only tools with
+hooks can run the guard, so the approval rule still holds on its own where the
+hook cannot establish the effect.
 
 `tests/test_selfcheck.py` breaks a throwaway repository in representative ways
 from every category and expects the complaint, so the main guard paths cannot
