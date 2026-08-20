@@ -148,6 +148,7 @@ user, and organization level.
 From a repository clone:
 
 ```bash
+make setup                             # guided install and update
 make install                           # all supported tools in this project
 make install-claude                    # one tool only
 make install ARGS=--user               # user-level install
@@ -156,6 +157,18 @@ make install ARGS="--into <path>"      # another project
 
 `install-codex` and `install-copilot` work like `install-claude`. Existing
 instruction files and organization-wide setup require the manual steps below.
+
+`make setup` checks the fixed user-level locations and project locations it
+previously installed, shows their baseline IDs, and offers updates or a new
+project or user-level installation. It checks the latest published release on
+GitHub, then falls back to the version in the checkout when there is no release
+or the check is unavailable; use `make setup ARGS=--offline` to skip the check.
+It never scans the whole home directory. Locally changed baseline files need a
+separate confirmation and are backed up before replacement, while existing
+instruction files and foreign symlinks remain untouched.
+Known project paths are recorded in
+`~/.config/ai-secure-coding-baseline/installations.json`; the managed
+user-level copy lives under `~/.local/share/ai-secure-coding-baseline/`.
 
 ### Claude Code
 

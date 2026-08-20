@@ -6,8 +6,11 @@ that is not its own, and one that is not idempotent cannot be run twice. Both
 are checked here against a throwaway directory.
 """
 
+import base64
+import os
 import sys
 import tempfile
+import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -71,6 +74,213 @@ with tempfile.TemporaryDirectory() as tmp:
     check("a foreign symlink is refused, not replaced",
           stale.readlink() == Path("somewhere-else.md")
           and any("points elsewhere" in line for line in report), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    occupied = root / install.BASELINE
+    occupied.write_text("not a baseline\n")
+    report = run(root, "codex")
+    check("an unrelated baseline filename survives untouched",
+          occupied.read_text() == "not a baseline\n")
+    check("invalid baseline content blocks tool links",
+          not (root / "AGENTS.md").exists()
+          and any("not a valid baseline" in line for line in report), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    report = install.install(["claude", "codex"], home, home)
+    source = install.user_source(home)
+    check("user installs keep a managed baseline outside the checkout",
+          source.is_file() and source.resolve() != install.SOURCE.resolve())
+    check("Claude's user link reads the managed baseline",
+          (home / ".claude" / install.BASELINE).resolve() == source.resolve())
+    check("Claude imports the managed baseline",
+          f"@{source}" in (home / ".claude" / "CLAUDE.md").read_text().splitlines())
+    check("Codex's user instructions read the managed baseline",
+          (home / ".codex" / "AGENTS.md").resolve() == source.resolve(), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    manual = home / ".codex" / "AGENTS.md"
+    manual.parent.mkdir()
+    manual.write_bytes(install.bundled_baseline().content)
+    found = install.scan_user(home)
+    check("known user locations reveal manually copied baselines",
+          len(found) == 1
+          and found[0].kind == "unmanaged"
+          and found[0].tools == ("codex",))
+
+with tempfile.TemporaryDirectory() as tmp:
+    state = Path(tmp) / "installations.json"
+    state.write_text("not json\n")
+    _registry, writable, note = install.load_registry(state)
+    check("an invalid installation registry is never overwritten",
+          not writable and note is not None and state.read_text() == "not json\n")
+
+check("stable SemVer sorts after its prerelease",
+      install.SemVer.parse("1.0.0-rc.1") < install.SemVer.parse("1.0.0"))
+check("numeric SemVer prereleases sort numerically",
+      install.SemVer.parse("1.0.0-2") < install.SemVer.parse("1.0.0-10"))
+try:
+    install.SemVer.parse("1.0.0-01")
+except ValueError:
+    invalid_semver_rejected = True
+else:
+    invalid_semver_rejected = False
+check("invalid SemVer numeric prereleases are rejected", invalid_semver_rejected)
+
+bundled = install.bundled_baseline()
+new_content = bundled.content.replace(
+    bundled.baseline_id.encode(), b"aisec-9.8.7", 1
+)
+
+
+def fake_release(url: str) -> object:
+    if url == install.LATEST_RELEASE_URL:
+        return {"tag_name": "v9.8.7", "draft": False, "prerelease": False}
+    return {
+        "type": "file",
+        "encoding": "base64",
+        "content": base64.b64encode(new_content).decode(),
+    }
+
+
+release = install.fetch_release_baseline(fake_release)
+check("a tagged release baseline is parsed and version-matched",
+      str(release.version) == "9.8.7")
+
+
+def mismatched_release(url: str) -> object:
+    if url == install.LATEST_RELEASE_URL:
+        return {"tag_name": "v9.8.6", "draft": False, "prerelease": False}
+    return fake_release(url)
+
+
+try:
+    install.fetch_release_baseline(mismatched_release)
+except ValueError:
+    mismatch_rejected = True
+else:
+    mismatch_rejected = False
+check("a release tag cannot supply a different baseline version", mismatch_rejected)
+
+try:
+    install._GitHubRedirectHandler().redirect_request(
+        None, None, 302, "redirect", {}, "https://example.com/baseline"
+    )
+except urllib.error.HTTPError:
+    redirect_rejected = True
+else:
+    redirect_rejected = False
+check("the updater rejects cross-host redirects", redirect_rejected)
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    old_content = bundled.content.replace(
+        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+    )
+    install.install(["codex"], root, None, content=old_content)
+    first = install.scan_project(root, {})
+    tracked = install.Installation(
+        first.kind, first.root, first.source, first.baseline, first.tools,
+        first.baseline.digest,
+    )
+    report, updated = install.update_installation(
+        tracked, bundled, lambda _question, _default: False
+    )
+    check("a tracked baseline updates without a second overwrite prompt",
+          updated is not None and updated.baseline.digest == bundled.digest, str(report))
+    check("a tracked update does not create a backup",
+          not (root / f"{install.BASELINE}.bak").exists())
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    old_content = bundled.content.replace(
+        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+    )
+    install.install(["codex"], root, None, content=old_content)
+    first = install.scan_project(root, {})
+    changed_content = old_content + b"\nlocal note\n"
+    (root / install.BASELINE).write_bytes(changed_content)
+    changed = install.scan_project(root, {"sha256": first.baseline.digest})
+    report, updated = install.update_installation(
+        changed, bundled, lambda _question, _default: False
+    )
+    check("a locally changed baseline is not replaced by default",
+          updated is None and (root / install.BASELINE).read_bytes() == changed_content,
+          str(report))
+    report, updated = install.update_installation(
+        changed, bundled, lambda _question, _default: True
+    )
+    check("an explicitly approved local replacement keeps a backup",
+          updated is not None
+          and (root / f"{install.BASELINE}.bak").read_bytes() == changed_content,
+          str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    old_checkout = home / "old-checkout"
+    old_checkout.mkdir()
+    old_source = old_checkout / install.BASELINE
+    old_source.write_bytes(bundled.content)
+    target = home / ".codex" / "AGENTS.md"
+    target.parent.mkdir()
+    target.symlink_to(old_source)
+    legacy = install.scan_user(home)
+    report, migrated = install.migrate_legacy_user(legacy[0], bundled)
+    check("checkout-linked user installs migrate to managed storage",
+          migrated is not None
+          and target.resolve() == install.user_source(home).resolve(), str(report))
+    check("migration does not modify the old checkout",
+          old_source.read_bytes() == bundled.content)
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    state = home / "state.json"
+    answers = iter(["2", ""])
+    output: list[str] = []
+    result = install.interactive_setup(
+        home=home,
+        input_fn=lambda _prompt: next(answers),
+        output=output.append,
+        check_online=False,
+        state_path=state,
+    )
+    check("guided setup can install all supported user tools",
+          result == 0
+          and install.user_source(home).is_file()
+          and (home / ".codex" / "AGENTS.md").is_symlink(), str(output))
+    state_mode = os.stat(state).st_mode & 0o777 if state.exists() else None
+    check("guided setup records known installation locations",
+          state.is_file() and state_mode == 0o600, str(state_mode))
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+    old_content = bundled.content.replace(
+        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+    )
+    install.install(["codex"], project, None, content=old_content)
+    previous = install.scan_project(project, {})
+    registry = install.empty_registry()
+    install.record_installation(registry, previous, trusted=True)
+    state = sandbox / "state.json"
+    install.save_registry(state, registry)
+    output = []
+    result = install.interactive_setup(
+        home=home,
+        input_fn=lambda _prompt: "",
+        output=output.append,
+        check_online=False,
+        state_path=state,
+    )
+    check("guided setup offers and applies registered project updates",
+          result == 0
+          and install.read_baseline(project / install.BASELINE).digest == bundled.digest,
+          str(output))
 
 print(f"\ninstall: {'ok' if not failures else f'{failures} failures'}")
 sys.exit(1 if failures else 0)
