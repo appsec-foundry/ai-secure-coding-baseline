@@ -173,7 +173,13 @@ class Installation:
         return (
             self.kind != "unmanaged"
             and self.baseline.is_official
-            and self.baseline.version < available.version
+            and (
+                self.baseline.version < available.version
+                or (
+                    self.baseline.version == available.version
+                    and self.baseline.digest != available.digest
+                )
+            )
         )
 
 
@@ -691,9 +697,12 @@ def scan_user(home: Path, user_entry: object = None) -> list[Installation]:
 
 
 def discover_installations(
-    home: Path, registry: dict[str, object]
+    home: Path,
+    registry: dict[str, object],
+    current_root: Path | None = None,
 ) -> list[Installation]:
-    installations = scan_user(home, registry.get("user"))
+    user_entry = registry.get("user")
+    installations = scan_user(home, user_entry if isinstance(user_entry, dict) else {})
     projects = registry.get("projects", {})
     if not isinstance(projects, dict):
         return installations
@@ -707,6 +716,25 @@ def discover_installations(
         if installation:
             installations.append(installation)
         installations.extend(scan_unmanaged_project_files(root))
+
+    if current_root is not None:
+        current_root = current_root.resolve()
+        current_entry = projects.get(str(current_root))
+        installation = scan_project(
+            current_root,
+            current_entry if isinstance(current_entry, dict) else {},
+        )
+        current_items = ([installation] if installation else [])
+        current_items.extend(scan_unmanaged_project_files(current_root))
+        seen = {
+            item.source.resolve(strict=False)
+            for item in installations
+        }
+        for item in current_items:
+            source = item.source.resolve(strict=False)
+            if source not in seen:
+                installations.append(item)
+                seen.add(source)
     return installations
 
 
@@ -868,10 +896,16 @@ def update_installation(
         report.append(f"backed up {installation.source} to {backup}")
 
     _atomic_replace(installation.source, available.content)
-    report.append(
-        f"updated {installation.source}: "
-        f"{installation.baseline.version} -> {available.version}"
-    )
+    if installation.baseline.version == available.version:
+        report.append(
+            f"replaced differing {installation.baseline.baseline_id} content "
+            f"in {installation.source}"
+        )
+    else:
+        report.append(
+            f"updated {installation.source}: "
+            f"{installation.baseline.version} -> {available.version}"
+        )
     baseline = read_baseline(installation.source)
     return report, Installation(
         installation.kind,
@@ -945,33 +979,111 @@ def _path_from_answer(answer: str, home: Path) -> Path:
     return candidate.resolve()
 
 
+def _installation_state(installation: Installation, available: Baseline) -> str:
+    if not installation.baseline.is_official:
+        return "customized; automatic update disabled"
+    if installation.kind == "unmanaged":
+        return "manual file; automatic update disabled"
+    if installation.has_update(available):
+        if installation.baseline.version < available.version:
+            state = f"update to {available.baseline_id} available"
+        else:
+            state = f"content differs from available {available.baseline_id}"
+        if (
+            installation.kind in {"project", "user"}
+            and installation.tracked_digest != installation.baseline.digest
+        ):
+            state += "; replacement needs separate confirmation and a backup"
+        return state
+    if installation.baseline.version > available.version:
+        return "newer than the available baseline"
+    if installation.kind == "legacy-user":
+        return "version matches; migration to managed storage recommended"
+    if available.origin.startswith("GitHub release "):
+        return "current published version"
+    return "matches the bundled baseline"
+
+
+def _installation_line(
+    installation: Installation,
+    available: Baseline,
+    *,
+    include_label: bool,
+) -> str:
+    tools = (
+        ", ".join(TOOL_LABELS[tool] for tool in installation.tools)
+        or "no tool integrations"
+    )
+    if include_label:
+        label = installation.label
+    elif installation.kind == "unmanaged":
+        label = f"manual file {display_path(installation.source)}"
+    elif installation.kind == "project":
+        label = "project baseline"
+    elif installation.kind == "legacy-user":
+        label = f"checkout-linked baseline {display_path(installation.source)}"
+    else:
+        label = "managed user baseline"
+    return (
+        f"  - {label}: {installation.baseline.baseline_id} — "
+        f"{_installation_state(installation, available)} ({tools})"
+    )
+
+
 def _show_installations(
     output: Callable[[str], None],
     installations: list[Installation],
     available: Baseline,
+    heading: str,
 ) -> None:
+    output(heading)
     if not installations:
-        output("\nNo managed installations found in known locations.")
+        output("  - no baseline found")
         return
-    output("\nFound installations:")
     for installation in installations:
-        tools = ", ".join(TOOL_LABELS[tool] for tool in installation.tools) or "no tools"
-        if not installation.baseline.is_official:
-            state = "customized; automatic update disabled"
-        elif installation.kind == "unmanaged":
-            state = "manual file; automatic update disabled"
-        elif installation.has_update(available):
-            state = f"update to {available.version} available"
-        elif installation.baseline.version > available.version:
-            state = "newer than available source"
-        elif installation.kind == "legacy-user":
-            state = "current; migration to managed storage recommended"
+        output(_installation_line(installation, available, include_label=True))
+
+
+def _show_setup_status(
+    output: Callable[[str], None],
+    installations: list[Installation],
+    available: Baseline,
+    home: Path,
+    current_root: Path,
+) -> None:
+    current_resolved = current_root.resolve(strict=False)
+    home_resolved = home.resolve(strict=False)
+    current: list[Installation] = []
+    user: list[Installation] = []
+    other: list[Installation] = []
+    for installation in installations:
+        root = installation.root.resolve(strict=False)
+        if installation.kind in {"user", "legacy-user"}:
+            user.append(installation)
+        elif installation.kind == "unmanaged" and root == home_resolved:
+            user.append(installation)
+        elif root == current_resolved:
+            current.append(installation)
         else:
-            state = "current"
-        output(
-            f"  - {installation.label}: {installation.baseline.baseline_id} "
-            f"({tools}; {state})"
-        )
+            other.append(installation)
+
+    output("\nInstallation status")
+    output(f"\nCurrent project {display_path(current_root)}:")
+    if not any(item.kind == "project" for item in current):
+        output("  - no managed project installation")
+    for installation in current:
+        output(_installation_line(installation, available, include_label=False))
+
+    output("\nUser-wide:")
+    if not any(item.kind in {"user", "legacy-user"} for item in user):
+        output("  - no managed user installation")
+    for installation in user:
+        output(_installation_line(installation, available, include_label=False))
+
+    if other:
+        output("\nOther known projects:")
+        for installation in other:
+            output(_installation_line(installation, available, include_label=True))
 
 
 def _record_current_scope(
@@ -981,89 +1093,188 @@ def _record_current_scope(
 ) -> None:
     if not installation:
         return
-    trusted = installation.baseline.digest == available.digest
+    trusted = (
+        installation.baseline.digest == available.digest
+        or installation.tracked_digest == installation.baseline.digest
+    )
     record_installation(registry, installation, trusted=trusted)
+
+
+def _update_key(installation: Installation) -> Path:
+    return installation.source.resolve(strict=False)
+
+
+def _review_updates(
+    installations: list[Installation],
+    available: Baseline,
+    registry: dict[str, object],
+    reviewed: set[Path],
+    input_fn: Callable[[str], str],
+    output: Callable[[str], None],
+) -> bool:
+    outdated = [
+        item
+        for item in installations
+        if item.has_update(available) and _update_key(item) not in reviewed
+    ]
+    if not outdated:
+        return False
+
+    output("\nUpdates available")
+    changed = False
+    for installation in outdated:
+        reviewed.add(_update_key(installation))
+        if installation.baseline.version < available.version:
+            question = (
+                f"Update {installation.label} from "
+                f"{installation.baseline.baseline_id} to {available.baseline_id}?"
+            )
+        else:
+            question = (
+                f"Replace the differing {installation.baseline.baseline_id} content "
+                f"in {installation.label} with the available copy?"
+            )
+        if not ask_yes_no(input_fn, question, True):
+            output(f"kept {installation.label} unchanged")
+            continue
+        report, updated = update_installation(
+            installation,
+            available,
+            lambda prompt, default: ask_yes_no(input_fn, prompt, default),
+        )
+        for line in report:
+            output(line)
+        if updated:
+            record_installation(registry, updated, trusted=True)
+            changed = True
+    return changed
 
 
 def _install_project_interactively(
     home: Path,
     registry: dict[str, object],
     available: Baseline,
+    reviewed_updates: set[Path],
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
+    root: Path | None = None,
 ) -> bool:
-    answer = _read_answer(input_fn, "Project directory (blank to cancel): ")
-    if not answer:
-        return False
-    try:
-        root = _path_from_answer(answer, home)
-    except (OSError, RuntimeError):
-        output("Invalid project path.")
-        return False
+    if root is None:
+        answer = _read_answer(input_fn, "Project directory (blank to cancel): ")
+        if not answer:
+            return False
+        try:
+            root = _path_from_answer(answer, home)
+        except (OSError, RuntimeError):
+            output("Invalid project path.")
+            return False
+    else:
+        root = root.resolve()
     if root == Path(root.anchor) or not root.is_dir():
         output("Project directory must be an existing non-root directory.")
         return False
 
     projects = registry.get("projects", {})
     entry = projects.get(str(root)) if isinstance(projects, dict) else None
-    existing = scan_project(root, entry)
+    existing = scan_project(root, entry if isinstance(entry, dict) else {})
     unmanaged = scan_unmanaged_project_files(root)
-    if unmanaged:
-        _show_installations(output, unmanaged, available)
-    if existing and existing.has_update(available):
-        if ask_yes_no(input_fn, f"Update {existing.label} first?", True):
-            report, updated = update_installation(
-                existing,
-                available,
-                lambda question, default: ask_yes_no(input_fn, question, default),
-            )
-            for line in report:
-                output(line)
-            if updated:
-                existing = updated
-                record_installation(registry, updated, trusted=True)
+    found = ([existing] if existing else []) + unmanaged
+    _show_installations(
+        output,
+        found,
+        available,
+        f"\nSelected project {display_path(root)}:",
+    )
+    changed = _review_updates(
+        found,
+        available,
+        registry,
+        reviewed_updates,
+        input_fn,
+        output,
+    )
 
     tools = choose_tools(input_fn, output, TOOLS)
     if not tools:
         output("Setup cancelled.")
-        return False
+        return changed
     for line in install(tools, root, None, content=available.content):
         output(line)
-    installed = scan_project(root, entry or {})
+    projects = registry.get("projects", {})
+    entry = projects.get(str(root)) if isinstance(projects, dict) else None
+    installed = scan_project(root, entry if isinstance(entry, dict) else {})
     _record_current_scope(registry, installed, available)
-    return installed is not None
+    return changed or installed is not None
 
 
 def _install_user_interactively(
     home: Path,
     registry: dict[str, object],
     available: Baseline,
+    reviewed_updates: set[Path],
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
 ) -> bool:
-    existing = scan_user(home, registry.get("user"))
-    legacy = [item for item in existing if item.kind == "legacy-user"]
+    user_entry = registry.get("user")
+    existing = scan_user(home, user_entry if isinstance(user_entry, dict) else {})
+    _show_installations(output, existing, available, "\nSelected user-wide scope:")
+    changed = _review_updates(
+        existing,
+        available,
+        registry,
+        reviewed_updates,
+        input_fn,
+        output,
+    )
+    user_entry = registry.get("user")
+    existing = scan_user(home, user_entry if isinstance(user_entry, dict) else {})
+    legacy = [
+        item
+        for item in existing
+        if item.kind == "legacy-user" and _update_key(item) not in reviewed_updates
+    ]
     if legacy and ask_yes_no(
         input_fn, "Move checkout-linked user installation to managed storage?", True
     ):
         for installation in legacy:
+            reviewed_updates.add(_update_key(installation))
             report, migrated = migrate_legacy_user(installation, available)
             for line in report:
                 output(line)
             if migrated:
                 record_installation(registry, migrated, trusted=True)
+                changed = True
 
     tools = choose_tools(input_fn, output, ("claude", "codex"))
     if not tools:
         output("Setup cancelled.")
-        return False
+        return changed
     for line in install(tools, Path.cwd(), home, content=available.content):
         output(line)
-    managed = [item for item in scan_user(home, registry.get("user")) if item.kind == "user"]
+    user_entry = registry.get("user")
+    managed = [
+        item
+        for item in scan_user(
+            home, user_entry if isinstance(user_entry, dict) else {}
+        )
+        if item.kind == "user"
+    ]
     if managed:
         _record_current_scope(registry, managed[0], available)
         return True
-    return False
+    return changed
+
+
+def _save_setup_registry(
+    state_path: Path,
+    registry: dict[str, object],
+    registry_writable: bool,
+    output: Callable[[str], None],
+) -> None:
+    if registry_writable:
+        save_registry(state_path, registry)
+    else:
+        output("Changes completed, but the invalid registry was not overwritten.")
 
 
 def interactive_setup(
@@ -1073,65 +1284,82 @@ def interactive_setup(
     output: Callable[[str], None] = print,
     check_online: bool = True,
     state_path: Path | None = None,
+    current_root: Path | None = None,
 ) -> int:
     available, online_note = latest_available(check_online)
     state_path = state_path or registry_path(home)
     registry, registry_writable, registry_note = load_registry(state_path)
+    current_root = (current_root or Path.cwd()).resolve()
+    if current_root == Path(current_root.anchor) or not current_root.is_dir():
+        raise ValueError("current project must be an existing non-root directory")
 
-    output(f"AI Secure Coding Baseline {available.version}")
+    output("AI Secure Coding Baseline setup")
+    output(f"Available: {available.baseline_id} ({available.origin})")
     output(online_note)
     if registry_note:
         output(registry_note)
-    installations = discover_installations(home, registry)
-    _show_installations(output, installations, available)
+    installations = discover_installations(home, registry, current_root)
+    _show_setup_status(output, installations, available, home, current_root)
 
-    outdated = [item for item in installations if item.has_update(available)]
-    if outdated and ask_yes_no(
-        input_fn, f"Update {len(outdated)} outdated installation(s) now?", True
-    ):
-        changed = False
-        for installation in outdated:
-            report, updated = update_installation(
-                installation,
-                available,
-                lambda question, default: ask_yes_no(input_fn, question, default),
-            )
-            for line in report:
-                output(line)
-            if updated:
-                record_installation(registry, updated, trusted=True)
-                changed = True
-        if changed and registry_writable:
-            save_registry(state_path, registry)
-        elif changed:
-            output("Updates completed, but the invalid registry was not overwritten.")
-        return 0
+    reviewed_updates: set[Path] = set()
+    changed = _review_updates(
+        installations,
+        available,
+        registry,
+        reviewed_updates,
+        input_fn,
+        output,
+    )
+    if changed:
+        _save_setup_registry(state_path, registry, registry_writable, output)
 
-    output("\nWhat would you like to do?")
-    output("  1. Install or check a project")
-    output("  2. Install for this user")
-    output("  3. Exit")
-    choice = _read_answer(input_fn, "Choice [1]: ") or "1"
-    changed = False
-    if choice == "1":
-        changed = _install_project_interactively(
-            home, registry, available, input_fn, output
-        )
-    elif choice == "2":
-        changed = _install_user_interactively(
-            home, registry, available, input_fn, output
-        )
-    elif choice == "3":
-        output("No changes made.")
-        return 0
+    current_installed = any(
+        item.kind == "project"
+        and item.root.resolve(strict=False) == current_root.resolve(strict=False)
+        for item in installations
+    )
+    user_installed = any(item.kind in {"user", "legacy-user"} for item in installations)
+    current_action = "Check or add tools in" if current_installed else "Install in"
+    user_action = "Check or add tools for" if user_installed else "Install for"
+    output("\nNext action")
+    output(f"  1. {current_action} current project {display_path(current_root)}")
+    output("  2. Install or check another project")
+    output(f"  3. {user_action} this user")
+    output("  4. Exit")
+    choice = ""
+    for _ in range(3):
+        choice = _read_answer(input_fn, "Choice [4]: ") or "4"
+        if choice in {"1", "2", "3", "4"}:
+            break
+        output("Invalid selection. Choose 1, 2, 3, or 4.")
     else:
-        output("Invalid selection; no changes made.")
+        output("Invalid selection; no additional changes made.")
         return 2
 
-    if changed and registry_writable:
-        save_registry(state_path, registry)
-    elif changed:
-        output("Installation completed, but the invalid registry was not overwritten.")
+    action_changed = False
+    if choice == "1":
+        action_changed = _install_project_interactively(
+            home,
+            registry,
+            available,
+            reviewed_updates,
+            input_fn,
+            output,
+            current_root,
+        )
+    elif choice == "2":
+        action_changed = _install_project_interactively(
+            home, registry, available, reviewed_updates, input_fn, output
+        )
+    elif choice == "3":
+        action_changed = _install_user_interactively(
+            home, registry, available, reviewed_updates, input_fn, output
+        )
+
+    if action_changed:
+        _save_setup_registry(state_path, registry, registry_writable, output)
+    if choice == "4":
+        output("Setup complete." if changed else "No changes made.")
     return 0
 
 

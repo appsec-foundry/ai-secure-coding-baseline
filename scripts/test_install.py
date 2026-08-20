@@ -235,9 +235,13 @@ with tempfile.TemporaryDirectory() as tmp:
           old_source.read_bytes() == bundled.content)
 
 with tempfile.TemporaryDirectory() as tmp:
-    home = Path(tmp)
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
     state = home / "state.json"
-    answers = iter(["2", ""])
+    answers = iter(["3", ""])
     output: list[str] = []
     result = install.interactive_setup(
         home=home,
@@ -245,6 +249,7 @@ with tempfile.TemporaryDirectory() as tmp:
         output=output.append,
         check_online=False,
         state_path=state,
+        current_root=project,
     )
     check("guided setup can install all supported user tools",
           result == 0
@@ -269,18 +274,155 @@ with tempfile.TemporaryDirectory() as tmp:
     install.record_installation(registry, previous, trusted=True)
     state = sandbox / "state.json"
     install.save_registry(state, registry)
+    current = sandbox / "current"
+    current.mkdir()
     output = []
+    prompts: list[str] = []
+
+    def update_answers(prompt: str) -> str:
+        prompts.append(prompt)
+        return ""
+
     result = install.interactive_setup(
         home=home,
-        input_fn=lambda _prompt: "",
+        input_fn=update_answers,
         output=output.append,
         check_online=False,
         state_path=state,
+        current_root=current,
     )
     check("guided setup offers and applies registered project updates",
           result == 0
           and install.read_baseline(project / install.BASELINE).digest == bundled.digest,
           str(output))
+    check("an update does not hide the next-action menu",
+          any("Update project" in prompt for prompt in prompts)
+          and "\nNext action" in output,
+          f"prompts={prompts!r}, output={output!r}")
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+    old_content = bundled.content.replace(
+        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+    )
+    install.install(["codex"], home, home, content=old_content)
+    previous = [item for item in install.scan_user(home, {}) if item.kind == "user"][0]
+    registry = install.empty_registry()
+    install.record_installation(registry, previous, trusted=True)
+    state = sandbox / "state.json"
+    install.save_registry(state, registry)
+    answers = iter(["", "1", "2"])
+    prompts = []
+    output = []
+
+    def update_user_then_project(prompt: str) -> str:
+        prompts.append(prompt)
+        return next(answers)
+
+    result = install.interactive_setup(
+        home=home,
+        input_fn=update_user_then_project,
+        output=output.append,
+        check_online=False,
+        state_path=state,
+        current_root=project,
+    )
+    check("user-only setup clearly offers the current project",
+          result == 0
+          and "  - no managed project installation" in output
+          and any("Install in current project" in line for line in output),
+          str(output))
+    check("a user update can be followed by a project install",
+          install.read_baseline(install.user_source(home)).digest == bundled.digest
+          and (project / "AGENTS.md").is_symlink()
+          and any("Update user-wide from" in prompt for prompt in prompts),
+          f"prompts={prompts!r}, output={output!r}")
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    current = sandbox / "current"
+    project = sandbox / "known-project"
+    home.mkdir()
+    current.mkdir()
+    project.mkdir()
+    old_content = bundled.content.replace(
+        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+    )
+    install.install(["codex"], home, home, content=old_content)
+    install.install(["codex"], project, None, content=old_content)
+    registry = install.empty_registry()
+    user_installation = [
+        item for item in install.scan_user(home, {}) if item.kind == "user"
+    ][0]
+    install.record_installation(registry, user_installation, trusted=True)
+    install.record_installation(
+        registry, install.scan_project(project, {}), trusted=True
+    )
+    state = sandbox / "state.json"
+    install.save_registry(state, registry)
+    answers = iter(["n", "n", "4"])
+    prompts = []
+
+    def decline_separate_updates(prompt: str) -> str:
+        prompts.append(prompt)
+        return next(answers)
+
+    install.interactive_setup(
+        home=home,
+        input_fn=decline_separate_updates,
+        output=lambda _line: None,
+        check_online=False,
+        state_path=state,
+        current_root=current,
+    )
+    update_prompts = [prompt for prompt in prompts if prompt.startswith("Update ")]
+    check("different scopes receive separate update decisions",
+          len(update_prompts) == 2
+          and any("user-wide" in prompt for prompt in update_prompts)
+          and any("known-project" in prompt for prompt in update_prompts),
+          str(prompts))
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    current = sandbox / "current"
+    target = sandbox / "target"
+    home.mkdir()
+    current.mkdir()
+    target.mkdir()
+    old_content = bundled.content.replace(
+        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+    )
+    (target / install.BASELINE).write_bytes(old_content)
+    answers = iter(["2", str(target), "", "y", "2"])
+    output = []
+    result = install.interactive_setup(
+        home=home,
+        input_fn=lambda _prompt: next(answers),
+        output=output.append,
+        check_online=False,
+        state_path=sandbox / "state.json",
+        current_root=current,
+    )
+    check("an unlinked project baseline is checked before tools are added",
+          result == 0
+          and install.read_baseline(target / install.BASELINE).digest == bundled.digest
+          and (target / f"{install.BASELINE}.bak").read_bytes() == old_content
+          and (target / "AGENTS.md").is_symlink(),
+          str(output))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    same_version_content = bundled.content + b"\nlocal variation\n"
+    install.install(["codex"], root, None, content=same_version_content)
+    found = install.scan_project(root, {})
+    check("same-version content differences are not reported as current",
+          found is not None and found.has_update(bundled))
 
 print(f"\ninstall: {'ok' if not failures else f'{failures} failures'}")
 sys.exit(1 if failures else 0)
