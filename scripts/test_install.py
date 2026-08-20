@@ -129,10 +129,53 @@ else:
     invalid_semver_rejected = False
 check("invalid SemVer numeric prereleases are rejected", invalid_semver_rejected)
 
+tool_prompts: list[str] = []
+tool_output: list[str] = []
+chosen_tools = install.choose_tools(
+    lambda prompt: tool_prompts.append(prompt) or "1,2",
+    tool_output.append,
+    ("claude", "codex"),
+)
+check("guided tool selection clearly supports multiple tools",
+      chosen_tools == ["claude", "codex"]
+      and any("one or more" in line for line in tool_output)
+      and any("comma-separated" in prompt and "Enter = all" in prompt
+              for prompt in tool_prompts),
+      f"prompts={tool_prompts!r}, output={tool_output!r}")
+
 bundled = install.bundled_baseline()
 new_content = bundled.content.replace(
     bundled.baseline_id.encode(), b"aisec-9.8.7", 1
 )
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+    old_content = bundled.content.replace(
+        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+    )
+    install.install(["codex"], project, None, content=bundled.content)
+    install.install(["codex"], home, home, content=old_content)
+    state = sandbox / "installations.json"
+    status_output: list[str] = []
+    status_result = install.installation_status(
+        home=home,
+        output=status_output.append,
+        check_online=False,
+        state_path=state,
+        current_root=project,
+    )
+    check("status check marks current and outdated installations",
+          status_result == 0
+          and any(line.startswith("  ✓ project baseline:")
+                  for line in status_output)
+          and any(line.startswith("  ↻ managed user baseline:")
+                  for line in status_output),
+          str(status_output))
+    check("status check is read-only", not state.exists(), str(state))
 
 
 def fake_release(url: str) -> object:
@@ -255,6 +298,9 @@ with tempfile.TemporaryDirectory() as tmp:
           result == 0
           and install.user_source(home).is_file()
           and (home / ".codex" / "AGENTS.md").is_symlink(), str(output))
+    check("user-wide setup explains the Copilot project limitation",
+          any("GitHub Copilot" in line and "project" in line for line in output),
+          str(output))
     state_mode = os.stat(state).st_mode & 0o777 if state.exists() else None
     check("guided setup records known installation locations",
           state.is_file() and state_mode == 0o600, str(state_mode))

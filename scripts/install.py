@@ -944,11 +944,11 @@ def choose_tools(
     output: Callable[[str], None],
     tools: tuple[str, ...],
 ) -> list[str] | None:
-    output("\nChoose tools (press Enter for all):")
+    output("\nChoose one or more tools:")
     for number, tool in enumerate(tools, 1):
         output(f"  {number}. {TOOL_LABELS[tool]}")
     for _ in range(3):
-        answer = _read_answer(input_fn, "Tools: ")
+        answer = _read_answer(input_fn, "Tools (comma-separated; Enter = all): ")
         if not answer or answer.lower() == "all":
             return list(tools)
         chosen: list[str] = []
@@ -1004,6 +1004,17 @@ def _installation_state(installation: Installation, available: Baseline) -> str:
     return "matches the bundled baseline"
 
 
+def _installation_symbol(installation: Installation, available: Baseline) -> str:
+    if installation.baseline.digest == available.digest:
+        return "✓"
+    if installation.baseline.is_official and (
+        installation.baseline.version < available.version
+        or installation.baseline.version == available.version
+    ):
+        return "↻"
+    return "•"
+
+
 def _installation_line(
     installation: Installation,
     available: Baseline,
@@ -1025,7 +1036,8 @@ def _installation_line(
     else:
         label = "managed user baseline"
     return (
-        f"  - {label}: {installation.baseline.baseline_id} — "
+        f"  {_installation_symbol(installation, available)} {label}: "
+        f"{installation.baseline.baseline_id} — "
         f"{_installation_state(installation, available)} ({tools})"
     )
 
@@ -1068,6 +1080,7 @@ def _show_setup_status(
             other.append(installation)
 
     output("\nInstallation status")
+    output("  ✓ current   ↻ update available   • other detected installation")
     output(f"\nCurrent project {display_path(current_root)}:")
     if not any(item.kind == "project" for item in current):
         output("  - no managed project installation")
@@ -1245,6 +1258,10 @@ def _install_user_interactively(
                 record_installation(registry, migrated, trusted=True)
                 changed = True
 
+    output(
+        "\nGitHub Copilot has no local user-wide setup target; "
+        "install it for a project or configure account instructions manually."
+    )
     tools = choose_tools(input_fn, output, ("claude", "codex"))
     if not tools:
         output("Setup cancelled.")
@@ -1363,6 +1380,31 @@ def interactive_setup(
     return 0
 
 
+def installation_status(
+    *,
+    home: Path,
+    output: Callable[[str], None] = print,
+    check_online: bool = True,
+    state_path: Path | None = None,
+    current_root: Path | None = None,
+) -> int:
+    available, online_note = latest_available(check_online)
+    state_path = state_path or registry_path(home)
+    registry, _registry_writable, registry_note = load_registry(state_path)
+    current_root = (current_root or Path.cwd()).resolve()
+    if current_root == Path(current_root.anchor) or not current_root.is_dir():
+        raise ValueError("current project must be an existing non-root directory")
+
+    output("AI Secure Coding Baseline status")
+    output(f"Available: {available.baseline_id} ({available.origin})")
+    output(online_note)
+    if registry_note:
+        output(registry_note)
+    installations = discover_installations(home, registry, current_root)
+    _show_setup_status(output, installations, available, home, current_root)
+    return 0
+
+
 def _register_noninteractive(
     registry: dict[str, object], root: Path, home: Path | None
 ) -> None:
@@ -1395,13 +1437,20 @@ def main(argv: list[str] | None = None) -> int:
         "--interactive", action="store_true", help="run the guided setup and updater"
     )
     parser.add_argument(
-        "--offline", action="store_true", help="skip the release check during setup"
+        "--status", action="store_true", help="show installation status without changes"
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="skip the release check during setup or status",
     )
     args = parser.parse_args(argv)
 
     if args.interactive:
-        if args.tools or args.user:
-            parser.error("--interactive cannot be combined with tools or --user")
+        if args.tools or args.user or args.status:
+            parser.error(
+                "--interactive cannot be combined with tools, --user, or --status"
+            )
         if not sys.stdin.isatty():
             parser.error("interactive setup requires a terminal; use make install in scripts")
         try:
@@ -1413,8 +1462,21 @@ def main(argv: list[str] | None = None) -> int:
             print("Setup stopped after an error; review the reported files.", file=sys.stderr)
             return 1
 
+    if args.status:
+        if args.tools or args.user:
+            parser.error("--status cannot be combined with tools or --user")
+        try:
+            return installation_status(
+                home=Path.home(),
+                check_online=not args.offline,
+                current_root=args.into,
+            )
+        except (OSError, ValueError):
+            print("Status check stopped after an error.", file=sys.stderr)
+            return 1
+
     if args.offline:
-        parser.error("--offline is only valid with --interactive")
+        parser.error("--offline is only valid with --interactive or --status")
     tools = list(args.tools) or list(TOOLS)
     unknown = [tool for tool in tools if tool not in TOOLS]
     if unknown:

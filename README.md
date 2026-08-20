@@ -149,6 +149,7 @@ From a repository clone:
 
 ```bash
 make setup                             # guided install and update
+make status                            # read-only installation status
 make install                           # all supported tools in this project
 make install-claude                    # one tool only
 make install ARGS=--user               # user-level install
@@ -158,12 +159,21 @@ make install ARGS="--into <path>"      # another project
 `install-codex` and `install-copilot` work like `install-claude`. Existing
 instruction files and organization-wide setup require the manual steps below.
 
+`make status` checks the current project, the user-wide locations, and known
+project installations without changing them. Both it and `make setup` mark an
+exact match with `✓`, an available update with `↻`, and another detected state
+with `•`. Use `make status ARGS=--offline` to compare only with the bundled
+baseline.
+
 `make setup` shows the current project, the fixed user-level locations, and
 project locations it previously installed as separate scopes. Each found
 baseline is compared with the available copy; updates are offered individually
 for managed installations that do not match, and the scope menu remains
 available afterward so, for example, a user-wide installation can also be
 installed in the current project.
+In each scope, choose one or more tools by number or name, separated by commas;
+press Enter to select every tool shown. Copilot is available in project scopes;
+its account-level custom instructions must be configured manually.
 It checks the latest published release on GitHub, then falls back to the version
 in the checkout when there is no release or the check is unavailable; use
 `make setup ARGS=--offline` to skip the check. It never scans the whole home
