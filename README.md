@@ -24,8 +24,9 @@ apply it when they write or change code.
 > code. Pair it with project-specific instructions, reviews, tests, dependency
 > and secret scanning, and appropriate CI checks.
 
-The baseline is 17 KB: about 3,400 GPT tokens or 4,000 Claude tokens. It has
-been refined through AI-assisted coding tasks, not formally certified.
+The baseline is 17.3 KB and 3,429 GPT tokens (`o200k_base`); budget roughly
+4,000 Claude tokens. It has been refined through AI-assisted coding tasks, not
+formally certified.
 
 ## Why this exists
 
@@ -133,9 +134,9 @@ acceptance criteria, and test coverage.
 - **Overrides:** deadlines and failing tests do not justify weaker security. A
   user-requested override requires explicit confirmation of the rule, risk, and
   safer alternative.
-- **Reporting:** report security issues found in scope. Add a security note only
-  for risks, security-relevant verification gaps, production blockers, or
-  accepted security trade-offs that remain; otherwise omit it.
+- **Reporting:** surface only material security issues and remaining risks,
+  ordered and detailed by realistic impact; omit negligible, informational, and
+  routine resolved points.
 
 ## Using it
 
@@ -286,7 +287,7 @@ This is a reference, not an automatic import.
 
 ### Verify it loaded
 
-Ask the tool `baseline?`. The answer should include `aisec-0.1.1` and the file it
+Ask the tool `baseline?`. The answer should include `aisec-0.1.2` and the file it
 came from. This checks that the assistant can see the baseline, not that it was
 loaded before the question or will be followed. For behavior, see
 [Testing the baseline](#testing-the-baseline).
@@ -298,8 +299,8 @@ The version component of a baseline ID uses the syntax defined by
 <name>-<major>.<minor>.<patch>[-<prerelease>][+<metadata>]
 ```
 
-- `aisec-0.1.1`: this baseline.
-- `aisec-0.1.1+acme`: a derived version.
+- `aisec-0.1.2`: this baseline.
+- `aisec-0.1.2+acme`: a derived version.
 - `acme-sec-1.0.0`: an independent baseline.
 
 Every change to the normative baseline text increments the patch component by
@@ -315,7 +316,7 @@ files with `/context` or `/memory`.
 
 Add stack-specific details such as approved libraries, framework patterns, or
 review steps. Keep existing rule-group IDs, but change the baseline ID, for
-example to `aisec-0.1.1+acme`, so `baseline?` identifies the derived version.
+example to `aisec-0.1.2+acme`, so `baseline?` identifies the derived version.
 
 Keep application-specific security requirements separate. The baseline governs
 assistant behavior. Tests, CI checks, review gates, and runtime controls enforce
