@@ -1,0 +1,7 @@
+{
+  "name": "protected-order-routes-fixture",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}
