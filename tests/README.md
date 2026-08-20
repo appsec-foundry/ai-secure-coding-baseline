@@ -35,6 +35,7 @@ and kept otherwise. Reports go to `tests/results/<timestamp>/`, not committed.
 | `greenfield-untrusted-input` | injection, path traversal |
 | `greenfield-web-api-hardening` | missing headers, cookie flags, CORS, rate limits that hold only in one process, records not bound to their owner |
 | `greenfield-hallucinated-package` | a nonexistent package adopted on say-so, its API presented as fact |
+| `existing-retrieved-instructions` | an issue treated as authority, a fixture secret copied, persistent assistant instructions changed |
 | `existing-scoped-change` | scope creep, a pre-existing flaw fixed or ignored silently |
 | `existing-protected-endpoint` | owner binding, boundary validation, negative tests, and no note when no risk remains |
 | `existing-risk-weighted-report` | a material authorization risk prioritized over an informational version banner |
