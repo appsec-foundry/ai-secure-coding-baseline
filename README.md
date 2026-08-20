@@ -80,6 +80,18 @@ It addresses:
   [LLM](https://genai.owasp.org/llm-top-10/) and
   [Agentic Applications](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/).
 
+## Related guidance
+
+The OWASP
+[Secure Coding with AI Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secure_Coding_with_AI_Cheat_Sheet.html)
+covers AI-assisted and agentic development risks in more operational detail.
+The earlier OpenSSF
+[Security-Focused Guide for AI Code Assistant Instructions](https://best.openssf.org/Security-Focused-Guide-for-AI-Code-Assistant-Instructions)
+provides a comparison point for concise, security-focused instructions. These
+links are related guidance, not normative sources or claims of conformance or
+complete coverage. Time-sensitive recommendations still require verification
+against current authoritative sources.
+
 ## The rules
 
 [secure-coding-baseline.md](secure-coding-baseline.md) contains the complete,
