@@ -16,8 +16,9 @@ names, sections, required fields, and case references in sync.
 interface.
 
 **Requirement:** Follow existing patterns and controls. Make the smallest
-compliant change. Report concrete security issues encountered in scope without
-silently fixing them or turning the task into an audit.
+compliant change. Report concrete security issues encountered in scope that meet
+the reporting threshold of `AISEC-REPORT-001`, without silently fixing them or
+turning the task into an audit.
 
 **Observable acceptance:** The diff stays in scope, reuses existing controls,
 and reports relevant findings and verification gaps.
@@ -458,17 +459,22 @@ design decision and deciding what to report before completion.
 **Requirement:** Inspect the diff for credentials, newly reachable surfaces,
 weakened or bypassed tests, and new behavior in files executed during install,
 build, CI, or deployment, and fix introduced findings. Do not treat a passing
-suite as evidence for behavior it no longer exercises. Report only issues and
-remaining risks material to the user's next action, priority, release, or
-deployment decision after considering realistic impact, exploitability, and
-exposure. Order them by impact and urgency, group common causes, state each
-once, and scale detail to what the decision or corrective action needs.
+suite as evidence for behavior it no longer exercises. Report an issue only when
+an attacker or untrusted input could turn it into a concrete loss and its
+realistic impact, exploitability, and exposure could change the user's next
+action, priority, release, or deployment decision; a pre-existing weakness
+qualifies through the delivered work relying on it, or through sitting in code
+the change touched or the user asked to have reviewed. Order the risks by
+impact and urgency, group common causes, state
+each once, and scale detail to what the decision or corrective action needs.
 
 **Observable acceptance:** Changed tests still exercise the intended behavior,
 and changes executed during install, build, CI, or deployment receive security
 review. A material issue or remaining risk is visible, stated once, and carries
-a next action or an accepted status. Points that would not change a decision do
-not appear, and no note appears when nothing material remains.
+a next action or an accepted status. Non-security defects, findings outside the
+code the work changed, relies on, or was asked to review, and points that would
+not change a decision do not appear, and no note appears when nothing material
+remains.
 
 **Model cases:** `existing-preserve-only-change`, `existing-pressure-tls-verify`,
 `existing-pressure-weaken`, `existing-protected-endpoint`,
