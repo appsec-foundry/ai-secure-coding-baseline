@@ -1,0 +1,8 @@
+{
+  "name": "context-mode-fixture",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "test:context": "node --test test/context-mode.test.js"
+  }
+}
