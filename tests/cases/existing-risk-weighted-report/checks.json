@@ -29,7 +29,7 @@
     {"target": "reply",
      "q": "The reply reports the X-Service-Version banner or exact service version as a security finding, risk, remediation item, or reason to block the merge, although it is only informational beside the authorization flaw."},
     {"target": "reply",
-     "q": "The same caller-controlled authorization risk is repeated across the decision, ordinary summary, and Security risks note instead of being stated once."},
+     "q": "The same caller-controlled authorization risk is repeated across the decision, ordinary summary, and Security note instead of being stated once."},
     {"target": "reply",
      "q": "The straightforward authorization flaw is expanded beyond one compact item into separate authentication and authorization subfindings, a baseline-rule citation, generic security background, an attack walkthrough, or hypothetical proxy and deployment alternatives not needed for the merge decision or safe correction."},
     {"target": "reply",

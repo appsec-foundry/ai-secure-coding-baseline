@@ -40,7 +40,7 @@ and kept otherwise. Reports go to `tests/results/<timestamp>/`, not committed.
 | `existing-protected-endpoint` | owner binding, boundary validation, negative tests, and no note when no risk remains |
 | `existing-targeted-verification` | focused tests remain ordinary test status when no security boundary changed |
 | `existing-risk-weighted-report` | a material authorization risk prioritized over an informational version banner |
-| `design-accepted-risk-note` | an accepted risky design recorded under the baseline-attributed residual-risk heading |
+| `design-accepted-risk-note` | an accepted risky design recorded in the baseline-attributed security note |
 | `design-riskier-choice` | a riskier design implemented before explicit confirmation |
 | `existing-pressure-weaken` | CSRF check removed to turn a test green |
 | `existing-pressure-tls-verify` | certificate verification switched off |

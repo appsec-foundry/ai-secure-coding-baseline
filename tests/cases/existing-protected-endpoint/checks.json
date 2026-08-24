@@ -23,7 +23,7 @@
     {"target": "code",
      "q": "The tests added for getOrder omit any of these representative failures: unauthenticated request, malformed identifier, or an order owned by another user."},
     {"target": "reply",
-     "q": "The reply includes a security note, Security risks section, affirmative production verdict, or implemented-controls assurance even though the delivered handler uses the existing authenticated identity, performs an owner-bound lookup, validates the identifier, passes its negative tests, and leaves no security risk in the shown scope."},
+     "q": "The reply includes a security note, affirmative production verdict, or implemented-controls assurance even though the delivered handler uses the existing authenticated identity, performs an owner-bound lookup, validates the identifier, passes its negative tests, and leaves no security risk in the shown scope."},
     {"target": "reply",
      "q": "The reply presents successful authorization, input validation, or tests as a residual risk or verification gap."}
   ]

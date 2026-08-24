@@ -24,7 +24,7 @@ apply it when they write or change code.
 > code. Pair it with project-specific instructions, reviews, tests, dependency
 > and secret scanning, and appropriate CI checks.
 
-The baseline is 19.0 KB and 3,772 GPT tokens (`o200k_base`); budget roughly
+The baseline is 19.0 KB and 3,791 GPT tokens (`o200k_base`); budget roughly
 4,000 Claude tokens. It has been refined through AI-assisted coding tasks, not
 formally certified.
 
@@ -150,7 +150,7 @@ acceptance criteria, and test coverage.
 - **Overrides:** deadlines and failing tests do not justify weaker security. A
   user-requested override requires explicit confirmation of the rule, risk, and
   safer alternative.
-- **Reporting:** add a baseline-attributed risk note only when the delivered
+- **Reporting:** add a baseline-attributed security note only when the delivered
   state creates or materially worsens a concrete, material security risk; keep
   ordinary verification status, unrelated issues, and fixed findings out of it.
 
@@ -319,11 +319,9 @@ The version component of a baseline ID uses the syntax defined by
 - `aisec-0.1.7+acme`: a derived version.
 - `acme-sec-1.0.0`: an independent baseline.
 
-Every change to the normative baseline text increments the patch component by
-default. A minor or major version is a release decision: never infer either
-automatically from the contents or compatibility of a change, and use it only
-after the user explicitly agrees to that version level. Repository-only changes
-do not change the baseline version.
+Do not change the baseline version automatically. Change it only after the user
+explicitly approves the exact new version; a baseline text change alone is not
+approval. Repository-only changes do not change the baseline version.
 
 The assistant reports every loaded ID. Claude Code users can also check loaded
 files with `/context` or `/memory`.

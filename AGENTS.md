@@ -29,7 +29,7 @@ how baseline changes run here. Changes limited to repository tooling,
 configuration, workflow, documentation, the harness, or tests do not get a
 change specification when the normative baseline stays unchanged.
 
-Three rules hold no matter how small the baseline change looks:
+Four rules hold no matter how small the baseline change looks:
 
 - Requirements come only from an explicit user request, existing repository
   documentation, or commit history that clearly establishes the behavior. Name
@@ -47,6 +47,9 @@ Three rules hold no matter how small the baseline change looks:
   inherit that project hook. A command hook that cannot start or times out
   produces no decision, so the instruction remains authoritative where the
   hook or its normal permission fallback cannot establish the effect.
+- Do not change the baseline ID or version unless the user explicitly approves
+  the exact new value. A request to change the baseline text is not version
+  approval.
 
 Run `make check` after changing the baseline, the specs, test metadata, or the
 harness. It calls no model, takes seconds, and also holds this file to its own
