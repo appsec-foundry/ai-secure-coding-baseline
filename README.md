@@ -88,9 +88,8 @@ covers AI-assisted and agentic development risks in more operational detail.
 The earlier OpenSSF
 [Security-Focused Guide for AI Code Assistant Instructions](https://best.openssf.org/Security-Focused-Guide-for-AI-Code-Assistant-Instructions)
 provides a comparison point for concise, security-focused instructions. These
-links are related guidance, not normative sources or claims of conformance or
-complete coverage. Time-sensitive recommendations still require verification
-against current authoritative sources.
+are background sources, not claims of conformance or complete coverage. Check
+time-sensitive advice against current authoritative sources.
 
 ## The rules
 
@@ -165,7 +164,7 @@ user, and organization level.
 From a repository clone:
 
 ```bash
-make setup                             # guided install and update
+make setup                             # guided setup and updates
 make status                            # read-only installation status
 make install                           # all supported tools in this project
 make install-claude                    # one tool only
@@ -176,30 +175,22 @@ make install ARGS="--into <path>"      # another project
 `install-codex` and `install-copilot` work like `install-claude`. Existing
 instruction files and organization-wide setup require the manual steps below.
 
-`make status` checks the current project, the user-wide locations, and known
-project installations without changing them. Both it and `make setup` mark an
-exact match with `✓`, an available update with `↻`, and another detected state
-with `•`. Use `make status ARGS=--offline` to compare only with the bundled
-baseline.
+For normal setup and updates, run `make setup`. It shows the current project,
+the supported user-level locations, and projects managed by earlier runs.
+Choose a scope, then select tools by number or name; press Enter to select all
+tools shown. Copilot is available for projects only. Its account-level custom
+instructions must be configured manually.
 
-`make setup` shows the current project, the fixed user-level locations, and
-project locations it previously installed as separate scopes. Each found
-baseline is compared with the available copy; updates are offered individually
-for managed installations that do not match, and the scope menu remains
-available afterward so, for example, a user-wide installation can also be
-installed in the current project.
-In each scope, choose one or more tools by number or name, separated by commas;
-press Enter to select every tool shown. Copilot is available in project scopes;
-its account-level custom instructions must be configured manually.
-It checks the latest published release on GitHub, then falls back to the version
-in the checkout when there is no release or the check is unavailable; use
-`make setup ARGS=--offline` to skip the check. It never scans the whole home
-directory. Locally changed baseline files need a separate confirmation and are
-backed up before replacement, while existing instruction files and foreign
-symlinks remain untouched.
-Known project paths are recorded in
-`~/.config/ai-secure-coding-baseline/installations.json`; the managed
-user-level copy lives under `~/.local/share/ai-secure-coding-baseline/`.
+The installer uses the latest published release when available and otherwise
+uses the copy in the checkout. Pass `ARGS=--offline` to skip the release check.
+If a managed baseline was edited locally, the installer asks before replacing
+it and creates a backup. Existing instruction files and unrelated symlinks are
+left untouched.
+
+`make status` checks the same locations without changing them. It marks a
+current installation with `✓`, an available update with `↻`, and another
+detected state with `•`. Pass `ARGS=--offline` to compare only with the bundled
+copy.
 
 ### Claude Code
 
@@ -338,20 +329,32 @@ the application's requirements.
 
 ## Testing the baseline
 
-The test harness compares the same prompts with and without the baseline. It
-checks the assistant's response as well as the files it creates. Multi-turn
-cases cover risky choices, including whether the assistant explains the likely
-consequence and a safer alternative before asking for confirmation. They also
-verify that an accepted risk produces one Security note and that the note is
-left out when no reportable risk remains.
+Each directory under `tests/cases/` contains `prompt.md`, `checks.json`, and,
+where needed, `followup-*.md` files and a small `fixture/` project. For each
+run, `tests/run.py` creates a temporary working directory and copies in the
+fixture when present. It then starts the Claude or Codex CLI with the baseline
+installed in one arm and without it in the control arm. Both arms receive the
+same prompts and run three times by default.
+
+The runner captures each reply and the resulting files. `checks.json` defines
+required and forbidden patterns, files that must or must not change, per-turn
+expectations, and optional project test commands. Criteria that need
+interpretation go to a separate Claude judge; by default, the majority of three
+votes decides the result. The report compares violations per run between the
+control and baseline arms. This shows whether the baseline changes behavior,
+but it is not a deterministic test result.
 
 ```bash
-make check                                         # validate the cases, no model calls
-python3 tests/run.py --cases greenfield-order-app  # one case, both arms
+make check                                         # validate the suite; no model calls
+make dry-run                                       # preview the model-run matrix
+python3 tests/run.py --cases greenfield-order-app  # run one case in both arms
+make test                                          # all cases with Claude
+make test-all                                      # all cases with Claude and Codex
 ```
 
-Model runs cost tokens and provide directional evidence, not statistical proof.
-See [tests/README.md](tests/README.md).
+`make check` is the fast CI check. Model runs cost tokens and can take hours, so
+normally run only the cases affected by a baseline change. See
+[tests/README.md](tests/README.md) for the cases, scoring, and report format.
 
 ## An example gate
 
