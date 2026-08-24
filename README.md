@@ -338,7 +338,12 @@ the application's requirements.
 
 ## Testing the baseline
 
-The test harness compares the same prompts with and without the baseline.
+The test harness compares the same prompts with and without the baseline. It
+checks the assistant's response as well as the files it creates. Multi-turn
+cases cover risky choices, including whether the assistant explains the likely
+consequence and a safer alternative before asking for confirmation. They also
+verify that an accepted risk produces one Security note and that the note is
+left out when no reportable risk remains.
 
 ```bash
 make check                                         # validate the cases, no model calls

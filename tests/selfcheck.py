@@ -54,10 +54,14 @@ REGEX_KEYS = ["forbidden_regex", "required_regex",
 KNOWN_KEYS = set(REGEX_KEYS) | {
     "mode", "why", "turns", "requirements", "reads_inverted", "scope_note",
     "verify_note", "note_on_the_key", "note_on_the_package", "judge", "must_modify",
-    "must_not_modify", "verify", "fixture_precondition",
+    "must_not_modify", "verify", "fixture_precondition", "conversation",
 }
 MODES = {"greenfield", "existing"}
 TARGETS = {"code", "reply"}
+CONVERSATION_KEYS = {
+    "turn", "reaction", "security_note_count", "required_regex",
+    "forbidden_regex", "judge",
+}
 
 problems: list[str] = []
 notes: list[str] = []
@@ -428,6 +432,90 @@ def check_case(d: Path, baseline_ids: set[str]) -> None:
         if item.get("target") not in TARGETS:
             fail(name, f"judge item {i}: target must be one of {sorted(TARGETS)}")
 
+    conversation = checks.get("conversation", [])
+    if not isinstance(conversation, list):
+        fail(name, "conversation must be a list")
+        conversation = []
+    elif "conversation" in checks and not conversation:
+        fail(name, "conversation must not be empty")
+
+    conversation_turns: set[int] = set()
+    expected_turns = set(range(1, len(followups) + 2))
+    for index, contract in enumerate(conversation):
+        where = f"conversation item {index}"
+        if not isinstance(contract, dict):
+            fail(name, f"{where} must be an object")
+            continue
+        for key in set(contract) - CONVERSATION_KEYS:
+            fail(name, f"{where} has unknown key {key!r}")
+
+        turn = contract.get("turn")
+        if not isinstance(turn, int) or isinstance(turn, bool) or turn < 1:
+            fail(name, f"{where} needs a positive integer turn")
+        elif turn in conversation_turns:
+            fail(name, f"conversation repeats turn {turn}")
+        else:
+            conversation_turns.add(turn)
+            note_id = f"turn-{turn}-security-note-count"
+            if note_id in ids:
+                fail(name, f"duplicate check id {note_id!r}")
+            ids.add(note_id)
+
+        if not isinstance(contract.get("reaction"), str) or not contract["reaction"].strip():
+            fail(name, f"{where} needs a non-empty reaction")
+        note_count = contract.get("security_note_count")
+        if (not isinstance(note_count, int) or isinstance(note_count, bool)
+                or note_count < 0):
+            fail(name, f"{where} needs a non-negative integer security_note_count")
+
+        for key in ("required_regex", "forbidden_regex"):
+            rules = contract.get(key, [])
+            if not isinstance(rules, list):
+                fail(name, f"{where} {key} must be a list")
+                continue
+            for rule_index, rule in enumerate(rules):
+                rule_where = f"{where} {key} item {rule_index}"
+                if not isinstance(rule, dict):
+                    fail(name, f"{rule_where} must be an object")
+                    continue
+                if (set(rule) - {"id", "pattern", "note"}):
+                    fail(name, f"{rule_where} has unknown keys")
+                if not isinstance(rule.get("id"), str) or not rule["id"].strip() \
+                        or not isinstance(rule.get("pattern"), str) or not rule["pattern"]:
+                    fail(name, f"{rule_where} needs both id and pattern")
+                    continue
+                if rule["id"] in ids:
+                    fail(name, f"duplicate check id {rule['id']!r}")
+                ids.add(rule["id"])
+                try:
+                    re.compile(rule["pattern"])
+                except re.error as exc:
+                    fail(name, f"{rule['id']}: pattern does not compile — {exc}")
+
+        contract_judge = contract.get("judge", [])
+        if not isinstance(contract_judge, list) or not contract_judge:
+            fail(name, f"{where} judge must be a non-empty list")
+            continue
+        for judge_index, item in enumerate(contract_judge):
+            judge_where = f"{where} judge item {judge_index}"
+            if not isinstance(item, dict):
+                fail(name, f"{judge_where} must be an object")
+                continue
+            if set(item) - {"id", "q"}:
+                fail(name, f"{judge_where} has unknown keys")
+            if not isinstance(item.get("id"), str) or not item["id"].strip():
+                fail(name, f"{judge_where} has no id")
+            elif item["id"] in ids:
+                fail(name, f"duplicate check id {item['id']!r}")
+            else:
+                ids.add(item["id"])
+            if not isinstance(item.get("q"), str) or not item["q"].strip():
+                fail(name, f"{judge_where} has no q")
+
+    if conversation and conversation_turns != expected_turns:
+        fail(name, "conversation must cover every turn exactly once: "
+             f"expected {sorted(expected_turns)}, got {sorted(conversation_turns)}")
+
     fixture = d / "fixture"
     scope_keys = [k for k in ("must_modify", "must_not_modify") if k in checks]
     if scope_keys and not fixture.is_dir():
@@ -474,7 +562,7 @@ def check_case(d: Path, baseline_ids: set[str]) -> None:
 
     has_check = (bool(judge) or any(checks.get(k) for k in REGEX_KEYS)
                  or any(checks.get(k) for k in ("must_modify", "must_not_modify"))
-                 or bool(checks.get("verify")))
+                 or bool(checks.get("verify")) or bool(conversation))
     if not has_check:
         fail(name, "no checks at all")
 

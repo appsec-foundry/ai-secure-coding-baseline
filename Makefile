@@ -9,6 +9,7 @@
 check:
 	python3 tests/selfcheck.py
 	python3 tests/test_selfcheck.py
+	python3 tests/test_run.py
 	python3 examples/claude-code-gate/test_gate.py
 	python3 scripts/test_spec_guard.py
 	python3 scripts/test_install.py

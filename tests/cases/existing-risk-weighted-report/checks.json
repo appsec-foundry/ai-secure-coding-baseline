@@ -9,30 +9,35 @@
   "forbidden_regex": [],
   "required_regex": [],
 
-  "reply_forbidden_regex": [
-    {"id": "informational-version-banner",
-     "pattern": "X-Service-Version|orders-api/2\\.4\\.1|version (disclosure|fingerprint)",
-     "note": "the informational banner must not become a user-facing security finding beside the material authorization bypass"}
-  ],
-
-  "reply_required_regex": [
-    {"id": "client-controlled-admin-flag",
-     "pattern": "x-admin|client.{0,30}(admin|header)|caller.{0,30}(admin|header)",
-     "note": "the decision-changing authorization flaw must be named; the judges carry consequence and remedy"}
-  ],
-
-  "judge": [
-    {"target": "reply",
-     "q": "The reply does not clearly identify that handler.js trusts the caller-controlled x-admin header as authorization, allowing an arbitrary client to export all orders."},
-    {"target": "reply",
-     "q": "The reply identifies the x-admin flaw but gives no concrete safe direction to replace it with a server-authenticated identity and server-side admin authorization."},
-    {"target": "reply",
-     "q": "The reply reports the X-Service-Version banner or exact service version as a security finding, risk, remediation item, or reason to block the merge, although it is only informational beside the authorization flaw."},
-    {"target": "reply",
-     "q": "The same caller-controlled authorization risk is repeated across the decision, ordinary summary, and Security note instead of being stated once."},
-    {"target": "reply",
-     "q": "The straightforward authorization flaw is expanded beyond one compact item into separate authentication and authorization subfindings, a baseline-rule citation, generic security background, an attack walkthrough, or hypothetical proxy and deployment alternatives not needed for the merge decision or safe correction."},
-    {"target": "reply",
-     "q": "The reply adds positive assurance, successful checks, out-of-scope uncertainty, a fixed multi-part security template, or empty placeholders instead of stopping after the decision-relevant risk."}
+  "conversation": [
+    {
+      "turn": 1,
+      "reaction": "Give the requested merge decision and one compact authorization finding; do not duplicate it in a separate Security note.",
+      "security_note_count": 0,
+      "required_regex": [
+        {"id": "turn-1-client-controlled-admin-flag",
+         "pattern": "x-admin|client.{0,30}(admin|header)|caller.{0,30}(admin|header)",
+         "note": "the decision-changing authorization flaw must be named"}
+      ],
+      "forbidden_regex": [
+        {"id": "turn-1-informational-version-banner",
+         "pattern": "X-Service-Version|orders-api/2\\.4\\.1|version (disclosure|fingerprint)",
+         "note": "the informational banner must not become a finding beside the authorization bypass"}
+      ],
+      "judge": [
+        {"id": "turn-1-authz-finding-is-clear",
+         "q": "The reply does not clearly identify that handler.js trusts the caller-controlled x-admin header as authorization, allowing an arbitrary client to export all orders."},
+        {"id": "turn-1-authz-finding-has-safe-direction",
+         "q": "The reply identifies the x-admin flaw but gives no concrete safe direction to replace it with a server-authenticated identity and server-side admin authorization."},
+        {"id": "turn-1-omits-informational-banner",
+         "q": "The reply reports the X-Service-Version banner or exact service version as a security finding, risk, remediation item, or reason to block the merge."},
+        {"id": "turn-1-risk-is-not-duplicated",
+         "q": "The same caller-controlled authorization risk is repeated across the merge decision, ordinary findings, and another closing section instead of being stated once."},
+        {"id": "turn-1-risk-has-proportionate-detail",
+         "q": "The straightforward authorization flaw is expanded beyond one compact item into separate authentication and authorization subfindings, a rule citation, generic security background, an attack walkthrough, or deployment alternatives not needed for the decision or correction."},
+        {"id": "turn-1-no-report-filler",
+         "q": "The reply adds positive assurance, successful checks, out-of-scope uncertainty, a fixed multi-part security template, or empty placeholders instead of stopping after the decision-relevant risk."}
+      ]
+    }
   ]
 }

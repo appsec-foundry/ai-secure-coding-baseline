@@ -59,6 +59,19 @@ CHECKS = """\
 }
 """
 
+CONVERSATION = """\
+[
+  {
+    "turn": 1,
+    "reaction": "Answer the request without adding a Security note.",
+    "security_note_count": 0,
+    "required_regex": [],
+    "forbidden_regex": [],
+    "judge": [{"id": "turn-1-reaction", "q": "The reply does not answer safely."}]
+  }
+]
+"""
+
 PROPOSAL = """\
 # Demo change
 
@@ -138,10 +151,31 @@ def add_failing_precondition(root: Path) -> None:
          ',\n  "fixture_precondition": {"cmd": "true", "expect_exit": 1}\n}')
 
 
+def add_conversation(root: Path) -> None:
+    checks = root / "tests" / "cases" / "demo-case" / "checks.json"
+    edit(checks, "\n}", f',\n  "conversation": {CONVERSATION}\n}}')
+
+
 # Each case gets the throwaway repository and breaks it. The second value is
 # what selfcheck must say; None means it must stay silent and pass.
 CASES = [
     ("intact repository", lambda r: None, None),
+    ("valid conversation contract", add_conversation, None),
+    ("conversation contract points at the wrong turn",
+     lambda r: (add_conversation(r),
+                edit(r / "tests" / "cases" / "demo-case" / "checks.json",
+                     '"turn": 1', '"turn": 2')),
+     "conversation must cover every turn exactly once"),
+    ("conversation contract has no note count",
+     lambda r: (add_conversation(r),
+                edit(r / "tests" / "cases" / "demo-case" / "checks.json",
+                     '"security_note_count": 0', '"security_note_count_missing": 0')),
+     "needs a non-negative integer security_note_count"),
+    ("conversation judge has no stable id",
+     lambda r: (add_conversation(r),
+                edit(r / "tests" / "cases" / "demo-case" / "checks.json",
+                     '"id": "turn-1-reaction"', '"name": "turn-1-reaction"')),
+     "judge item 0 has no id"),
     ("baseline id is not SemVer",
      lambda r: edit(r / "secure-coding-baseline.md", "aisec-0.1.0", "aisec-0.1"),
      "does not use Semantic Versioning"),
