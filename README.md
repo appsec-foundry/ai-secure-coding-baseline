@@ -1,7 +1,7 @@
 # AI Secure Coding Baseline
 
 [![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#)
-[![Last commit](https://img.shields.io/github/last-commit/matthiasrohr/ai-secure-coding-baseline.svg)](https://github.com/matthiasrohr/ai-secure-coding-baseline/commits)
+[![Last commit](https://img.shields.io/github/last-commit/appsec-foundry/ai-secure-coding-baseline.svg)](https://github.com/appsec-foundry/ai-secure-coding-baseline/commits)
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-D97757?logo=anthropic&logoColor=white)](https://code.claude.com/)
 [![GitHub Copilot](https://img.shields.io/badge/GitHub%20Copilot-compatible-000000?logo=githubcopilot&logoColor=white)](https://github.com/features/copilot)
@@ -11,7 +11,7 @@ A short set of secure-coding rules for AI coding assistants. Add it to a
 project's instructions so Claude Code, Copilot, Codex, and other agents can
 apply it when they write or change code.
 
-> The [appsec-advisor](https://github.com/matthiasrohr/appsec-advisor) Claude
+> The [appsec-advisor](https://github.com/appsec-foundry/appsec-advisor) Claude
 > Code plugin can install it with `/appsec-advisor:install-baseline`. For manual
 > setup, see [Using it](#using-it).
 
@@ -164,7 +164,29 @@ possible, and copy it only when necessary. The sections below cover Claude Code,
 GitHub Copilot, and agents that use [`AGENTS.md`](https://agents.md/) at project,
 user, and organization level.
 
-From a repository clone:
+### Installer skill (no checkout)
+
+Skill-capable agents can install
+[`secure-coding-baseline-installer`](skills/secure-coding-baseline-installer/)
+directly from this repository. For example, ask the agent's skill installer to
+resolve a release tag or the current `main` commit and install:
+
+```text
+https://github.com/appsec-foundry/ai-secure-coding-baseline/tree/<release-tag-or-commit>/skills/secure-coding-baseline-installer
+```
+
+Pin the executable skill package to that tag or commit rather than downloading
+it from a mutable branch name.
+
+Then invoke `$secure-coding-baseline-installer` to check, install, or update a
+project or user-wide baseline. The skill accepts content only from this
+repository, prefers a stable release, and otherwise pins `main` to a specific
+commit before downloading the baseline. It does not require the AppSec plugin
+or a repository checkout and never downloads or executes remote code.
+
+### From a repository clone
+
+Run:
 
 ```bash
 make setup                             # guided setup and updates

@@ -30,7 +30,7 @@ TOOL_LABELS = {
 }
 
 OFFICIAL_NAME = "aisec"
-GITHUB_REPOSITORY = "matthiasrohr/ai-secure-coding-baseline"
+GITHUB_REPOSITORY = "appsec-foundry/ai-secure-coding-baseline"
 LATEST_RELEASE_URL = (
     f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
 )

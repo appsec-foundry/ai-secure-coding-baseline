@@ -144,6 +144,8 @@ check("guided tool selection clearly supports multiple tools",
       f"prompts={tool_prompts!r}, output={tool_output!r}")
 
 bundled = install.bundled_baseline()
+check("the checkout installer uses the canonical upstream",
+      install.GITHUB_REPOSITORY == "appsec-foundry/ai-secure-coding-baseline")
 new_content = bundled.content.replace(
     bundled.baseline_id.encode(), b"aisec-9.8.7", 1
 )
