@@ -165,6 +165,7 @@ From a repository clone:
 
 ```bash
 make setup                             # guided setup and updates
+make update                            # guided update (same safe flow as setup)
 make status                            # read-only installation status
 make install                           # all supported tools in this project
 make install-claude                    # one tool only
@@ -175,8 +176,10 @@ make install ARGS="--into <path>"      # another project
 `install-codex` and `install-copilot` work like `install-claude`. Existing
 instruction files and organization-wide setup require the manual steps below.
 
-For normal setup and updates, run `make setup`. It shows the current project,
-the supported user-level locations, and projects managed by earlier runs.
+For normal setup and updates, run `make setup`; `make update` starts the same
+guided flow with the more discoverable update name. It shows the current
+project, the supported user-level locations, and projects managed by earlier
+runs.
 Choose a scope, then select tools by number or name; press Enter to select all
 tools shown. Copilot is available for projects only. Its account-level custom
 instructions must be configured manually.

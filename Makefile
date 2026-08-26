@@ -2,7 +2,7 @@
 # so the expensive targets run the free self-check before spending anything.
 
 .DEFAULT_GOAL := check
-.PHONY: check setup status install install-claude install-codex install-copilot \
+.PHONY: check setup update status install install-claude install-codex install-copilot \
         dry-run test test-all clean-results help
 
 ## check       validate the suite itself: no model calls, seconds
@@ -17,6 +17,9 @@ check:
 ## setup       guided install and update; ARGS=--offline skips the release check
 setup:
 	python3 scripts/install.py --interactive $(ARGS)
+
+## update      guided update; uses the same safe flow as setup
+update: setup
 
 ## status      show installed baseline status; ARGS=--offline skips release check
 status:
