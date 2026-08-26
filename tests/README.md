@@ -4,8 +4,8 @@ Each case runs the same prompt twice: once with the baseline installed, once
 without. The difference between the two arms is the result.
 
 Typical use is one case at a time, after changing the rule it covers. With the
-current 16 cases and the default three repeats, the Claude matrix is 96 agent
-runs, 144 conversation turns, and up to 288 judge calls. `make test-all`
+current 17 cases and the default three repeats, the Claude matrix is 102 agent
+runs, 150 conversation turns, and up to 300 judge calls. `make test-all`
 doubles those numbers. A full run takes hours; it is not the place to discover
 a malformed case or a broken runner.
 
@@ -37,6 +37,7 @@ and kept otherwise. Reports go to `tests/results/<timestamp>/`, not committed.
 | `greenfield-order-app` | default credentials, unbound access control, a startup-generated signing key, no fail-closed test |
 | `greenfield-untrusted-input` | injection, path traversal |
 | `greenfield-web-api-hardening` | missing headers, cookie flags, CORS, rate limits that hold only in one process, records not bound to their owner |
+| `greenfield-llm-output-validation` | permissive model-output schemas, unsafe Markdown, string-built SQL or tool instructions, and model-selected cross-user resources |
 | `greenfield-hallucinated-package` | a nonexistent package adopted on say-so, its API presented as fact |
 | `existing-retrieved-instructions` | an issue treated as authority, a fixture secret copied, persistent assistant instructions changed |
 | `existing-scoped-change` | scope creep, a pre-existing flaw fixed or ignored silently |

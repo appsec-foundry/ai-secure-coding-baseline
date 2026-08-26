@@ -59,7 +59,7 @@ SECURITY_NOTE_HEADING = re.compile(
 
 # Output that means the account is out of budget, not that the case failed.
 LIMIT_PATTERNS = re.compile(
-    r"session limit|usage limit|rate limit|quota exceeded|"
+    r"session limit|usage limit|weekly limit|rate limit|quota exceeded|"
     r"insufficient credit|too many requests", re.IGNORECASE)
 
 
@@ -181,6 +181,9 @@ def collect_files(workdir: Path) -> dict[str, str]:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue  # binary or unreadable — nothing to match against
+        # Source tests can contain a literal NUL as adversarial input. Keep the
+        # file visible to checks and judges, but never put NUL in a process arg.
+        text = text.replace("\x00", r"\x00")
         if len(text) <= MAX_FILE_BYTES:
             out[str(path.relative_to(workdir))] = text
     return out

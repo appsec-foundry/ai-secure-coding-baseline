@@ -1,6 +1,6 @@
 # AI Secure Coding Baseline
 
-`baseline-id: aisec-0.1.7`. When asked whether a baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: every baseline id you carry, each with the file you loaded it from.
+`baseline-id: aisec-0.1.8`. When asked whether a baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: every baseline id you carry, each with the file you loaded it from.
 
 ## Operating Mode
 
@@ -66,7 +66,10 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
   - For a greenfield deployable application, or an existing application when the change affects these areas, verify missing or invalid required configuration blocks startup, applicable production controls and headers work, and clean initialization creates no known credential or unintended privileged account.
   - For cookie-based or other ambient browser authentication, test that every state-changing browser action, including administrative actions, rejects a forged cross-site request, whether the guard is a token or an origin check.
   - Use the existing test framework. Report findings or, if testing is impossible, the reason and residual risk.
-- **[AISEC-LLM-001] LLM-Powered Features:** When a change builds or changes an LLM-powered feature, treat prompts, model and tool outputs, retrieved content, and memory as untrusted. Validate them and never let them override policy or authorization. Authorize each tool action server-side with least privilege, require human approval for consequential or irreversible actions, isolate data and memory across tenants, and review against the OWASP Top 10 for LLM and Agentic Applications.
+- **[AISEC-LLM-001] LLM-Powered Features:** When a change builds or changes an LLM-powered feature, treat prompts, model and tool outputs, retrieved content, and memory as untrusted, and never let them override policy, authorization, or task boundaries.
+  - Before downstream use, validate structured model output deterministically against strict schemas and applicable value allow-lists, rejecting unknown or ambiguous fields and values; encode it for its context or sanitize rendered markup with a maintained allow-list sanitizer.
+  - Keep model values separate from instructions and executable text through the sink's parameterized or structured API and allow-listed operations; never pass them directly to an interpreter. If generated-code execution is intended, confine it to a filesystem-, network-, time-, and resource-restricted sandbox.
+  - Authorize each tool action server-side with least privilege, require human approval for consequential or irreversible actions, isolate data and memory across tenants, and review against the current OWASP Top 10 for LLM and Agentic Applications.
 
 ## Before Completion
 

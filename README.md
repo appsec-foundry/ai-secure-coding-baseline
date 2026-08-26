@@ -24,7 +24,7 @@ apply it when they write or change code.
 > code. Pair it with project-specific instructions, reviews, tests, dependency
 > and secret scanning, and appropriate CI checks.
 
-The baseline is 19.0 KB and 3,791 GPT tokens (`o200k_base`); budget roughly
+The baseline is 19.6 KB and 3,899 GPT tokens (`o200k_base`); budget roughly
 4,000 Claude tokens. It has been refined through AI-assisted coding tasks, not
 formally certified.
 
@@ -75,8 +75,9 @@ It addresses:
 - **Dependency supply chains:** unverified or vulnerable package versions,
   mutable external artifacts, transitive changes, install scripts, lockfiles,
   reproducible builds, and scanning.
-- **LLM applications:** prompt injection, unsafe output and tool use, excessive
-  agency, and data exposure, based on the OWASP Top 10 for
+- **LLM applications:** prompt injection, strict output validation, safe
+  rendering and parameterized sinks, unsafe tool use, excessive agency, and
+  data exposure, based on the OWASP Top 10 for
   [LLM](https://genai.owasp.org/llm-top-10/) and
   [Agentic Applications](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/).
 
@@ -128,8 +129,10 @@ normative rules. Each rule requires a concrete mechanism, not a general goal.
   development tooling, and weakened settings out of production.
 - **Security tests** (`AISEC-TESTS-001`): test intended behavior and relevant
   failure or abuse cases whenever a control or trust boundary changes.
-- **LLM-powered features** (`AISEC-LLM-001`): treat prompts, model output,
-  retrieved content, and memory as untrusted, and authorize tool actions.
+- **LLM-powered features** (`AISEC-LLM-001`): treat model-controlled data as
+  untrusted, validate structured output strictly, render it safely, use
+  parameterized sink APIs, isolate intended code execution, and authorize tool
+  actions.
 
 **Workflow rules**
 
@@ -297,7 +300,7 @@ This is a reference, not an automatic import.
 
 ### Verify it loaded
 
-Ask the tool `baseline?`. The answer should include `aisec-0.1.7` and the file it
+Ask the tool `baseline?`. The answer should include `aisec-0.1.8` and the file it
 came from. This checks that the assistant can see the baseline, not that it was
 loaded before the question or will be followed. For behavior, see
 [Testing the baseline](#testing-the-baseline).
@@ -309,8 +312,8 @@ The version component of a baseline ID uses the syntax defined by
 <name>-<major>.<minor>.<patch>[-<prerelease>][+<metadata>]
 ```
 
-- `aisec-0.1.7`: this baseline.
-- `aisec-0.1.7+acme`: a derived version.
+- `aisec-0.1.8`: this baseline.
+- `aisec-0.1.8+acme`: a derived version.
 - `acme-sec-1.0.0`: an independent baseline.
 
 Do not change the baseline version automatically. Change it only after the user
@@ -324,7 +327,7 @@ files with `/context` or `/memory`.
 
 Add stack-specific details such as approved libraries, framework patterns, or
 review steps. Keep existing rule-group IDs, but change the baseline ID, for
-example to `aisec-0.1.7+acme`, so `baseline?` identifies the derived version.
+example to `aisec-0.1.8+acme`, so `baseline?` identifies the derived version.
 
 Keep application-specific security requirements separate. The baseline governs
 assistant behavior. Tests, CI checks, review gates, and runtime controls enforce

@@ -139,13 +139,14 @@ missing-context requests fail closed at the protected boundary.
 
 **Model cases:** `design-riskier-choice`, `existing-protected-endpoint`,
 `existing-risk-weighted-report`, `existing-scoped-change`,
-`greenfield-order-app`, `greenfield-web-api-hardening`
+`greenfield-llm-output-validation`, `greenfield-order-app`,
+`greenfield-web-api-hardening`
 
 **Evidence and gaps:** Partial. The cases cover API-key ownership, order
 ownership, server-derived roles, a review that must identify a caller-controlled
-admin header, and handlers that must reject an unauthenticated caller and
-another user's record. Network-position identity and cross-tenant isolation are
-not covered.
+admin header, an LLM-selected order identifier, and handlers that must reject an
+unauthenticated caller and another user's record. Network-position identity and
+cross-tenant isolation are not covered.
 
 ## AISEC-INPUT-001 — Untrusted Input
 
@@ -164,11 +165,13 @@ an allowed path, become shell syntax, choose arbitrary destinations, or reach an
 unsafe deserializer.
 
 **Model cases:** `existing-protected-endpoint`, `greenfield-order-app`,
-`greenfield-untrusted-input`, `greenfield-web-api-hardening`
+`greenfield-llm-output-validation`, `greenfield-untrusted-input`,
+`greenfield-web-api-hardening`
 
 **Evidence and gaps:** Partial. The cases cover SQL parameters, path containment,
-identifier boundaries, and request validation. Output encoding, process
-execution, destinations, and deserialization are not covered.
+identifier boundaries, request validation, and whether model output reaches SQL
+and browser rendering through safe boundaries. Process execution, destinations,
+and deserialization are not covered.
 
 ## AISEC-SECRETS-001 — Secrets & Credentials
 
@@ -423,11 +426,12 @@ baseline and report any testing gap and residual risk.
 and fail closed, including production configuration where applicable.
 
 **Model cases:** `existing-pressure-weaken`, `existing-protected-endpoint`,
-`greenfield-order-app`
+`greenfield-llm-output-validation`, `greenfield-order-app`
 
 **Evidence and gaps:** Partial. The cases cover CSRF success and rejection, a
 protected handler's unauthorized, malformed, and cross-user paths, and whether
-a new application ships any fail-closed test. Byte-length, out-of-band, and
+a new application ships fail-closed tests, including representative malformed,
+unsafe-markup, and cross-user LLM-output cases. Byte-length, out-of-band, and
 required-configuration categories are not covered.
 
 ## AISEC-LLM-001 — LLM-Powered Features
@@ -439,15 +443,25 @@ required-configuration categories are not covered.
 **Applies when:** Building or changing an LLM-powered feature.
 
 **Requirement:** Treat prompts, retrieval, memory, outputs, and tool input as
-untrusted. Keep authorization server-side, limit tools, require approval for
-consequential actions, isolate tenants, and review the named OWASP risks.
+untrusted. Validate structured output deterministically against strict schemas
+and allow-lists before use. Keep values separate from instructions and
+executable text through parameterized or structured sink APIs, encode text,
+sanitize intentionally rendered markup, and isolate intended code execution.
+Keep authorization server-side, limit tools, require approval for consequential
+actions, isolate tenants, and review the current named OWASP risks.
 
-**Observable acceptance:** Model-controlled data cannot override policy, exceed
-the user's authority, bypass approval, or cross tenant boundaries.
+**Observable acceptance:** Unknown, extra, invalid, or ambiguous model output
+fails closed. Model-controlled values cannot become executable syntax or active
+markup, override policy, exceed the user's authority, bypass approval, or cross
+tenant boundaries; intended generated-code execution is sandboxed.
 
-**Model cases:** None.
+**Model cases:** `greenfield-llm-output-validation`
 
-**Evidence and gaps:** None. No current model case declares this rule group.
+**Evidence and gaps:** Partial. The case covers a strict JSON contract, action
+allow-list, numeric range, SQL parameterization, safe Markdown rendering,
+owner-bound model-selected resources, and representative negative tests. It
+does not cover generated-code sandboxes, process invocation, URLs, paths,
+multi-tenant memory, or consequential-action approval.
 
 ## AISEC-REPORT-001 — Review and Report
 

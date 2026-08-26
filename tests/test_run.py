@@ -16,6 +16,17 @@ SPEC.loader.exec_module(RUNNER)
 
 
 class RunnerTests(unittest.TestCase):
+    def test_weekly_limit_is_recognized_as_quota_exhaustion(self):
+        self.assertRegex("You've hit your weekly limit", RUNNER.LIMIT_PATTERNS)
+
+    def test_collect_files_makes_literal_null_visible_and_process_safe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "negative.test.js"
+            source.write_bytes(b"const value = 'before\x00after';\n")
+            files = RUNNER.collect_files(Path(tmp))
+        self.assertEqual(files["negative.test.js"],
+                         "const value = 'before\\x00after';\n")
+
     def test_load_cases_ignores_hidden_tool_directories(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
