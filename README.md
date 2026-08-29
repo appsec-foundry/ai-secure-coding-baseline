@@ -166,25 +166,31 @@ Each rule requires a concrete mechanism, not a general goal.
 
 **Workflow rules**
 
-| Situation | Rule | Assistant behavior |
-| --- | --- | --- |
-| Existing application | `AISEC-OM-001` | Reuse existing security mechanisms, make the smallest compliant change, and report only qualifying pre-existing issues encountered in scope. |
-| New application or component | `AISEC-OM-002` | Establish applicable controls, secure configuration, and tests from the start; keep any explicitly requested prototype local-only and free of real sensitive data. |
-| Mixed request | `AISEC-OM-003` | Deliver the legitimate part, refuse only the forbidden part, and offer a concrete safe alternative where possible. |
-| Explicit override | `AISEC-OM-004` | Prefer a compliant path; if the user knowingly targets a control, require explicit confirmation of the rule, exposure, and safer alternative. |
-| Riskier design choice | `AISEC-OM-005` | Explain the concrete risk, safer option, and cost, then require explicit confirmation before implementing the riskier choice. |
-| Before completion | `AISEC-REPORT-001` | Inspect the changed diff and tests, fix introduced findings, and reserve the baseline security note for concrete material risks the delivered state creates or worsens. |
-
-**Scope:** In an existing application, apply the rules to changed code and its
-directly affected interfaces; reuse existing controls and avoid unrelated
-retrofits. For a new application or component, establish and verify every
-applicable control, configuration, and test from the start. If unclear, ask.
-
-**Confirmation versus reporting:** Ask before implementation only for a
-deliberate control override or materially riskier design choice. A **Security
-note (AISEC baseline)** is separate and appears only when the delivered result
-creates or worsens a qualifying material risk; asking does not itself warrant a
-note, and a note can appear without a prior confirmation.
+- **Existing application — change-scoped** (`AISEC-OM-001`): apply the baseline
+  to the code being changed and its directly affected interfaces. Reuse the
+  application's established patterns and security mechanisms, make the smallest
+  compliant change, and avoid unrelated retrofits.
+- **Greenfield application or component — creation-scoped** (`AISEC-OM-002`):
+  apply the baseline to all code and interfaces being created. Establish every
+  applicable control, secure configuration, and test as part of the design, and
+  verify them before the first production release.
+- **New component in an existing application:** treat the new component and its
+  interfaces as greenfield while integrating them through the application's
+  established security mechanisms. If the scope is unclear, ask rather than
+  treating an existing application as greenfield.
+- **Mixed request** (`AISEC-OM-003`): deliver the legitimate part, refuse only
+  the forbidden part, and offer a concrete safe alternative where possible.
+- **Explicit override** (`AISEC-OM-004`): prefer a compliant path; if the user
+  knowingly targets a control, require explicit confirmation of the rule,
+  exposure, and safer alternative before implementation.
+- **Riskier design choice** (`AISEC-OM-005`): explain the concrete risk, safer
+  option, and cost, then require explicit confirmation before implementing the
+  riskier choice.
+- **Before completion** (`AISEC-REPORT-001`): inspect the changed diff and
+  tests, fix introduced findings, and reserve the **Security note (AISEC
+  baseline)** for concrete material risks the delivered state creates or
+  worsens. Whether a note is required depends on the delivered risk, not on
+  whether prior confirmation was required.
 
 See [`specs/requirements.md`](specs/requirements.md) for applicability,
 acceptance criteria, and test coverage.
