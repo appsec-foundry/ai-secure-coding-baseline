@@ -28,6 +28,19 @@ The baseline is 19.6 KB and 3,899 GPT tokens (`o200k_base`); budget roughly
 4,000 Claude tokens. It has been refined through AI-assisted coding tasks, not
 formally certified.
 
+## Quick start
+
+```bash
+git clone https://github.com/appsec-foundry/ai-secure-coding-baseline
+cd ai-secure-coding-baseline
+./setup.sh          # same guided flow as: make setup
+```
+
+The installer asks for scope and tools, keeps existing instruction files, and
+runs again for updates. Without a checkout, use the
+[installer skill](#installer-skill-no-checkout). All other paths are under
+[Using it](#using-it).
+
 ## Why this exists
 
 AI coding assistants know many security practices but do not apply them
@@ -189,6 +202,7 @@ or a repository checkout and never downloads or executes remote code.
 Run:
 
 ```bash
+./setup.sh                             # guided setup and updates, without make
 make setup                             # guided setup and updates
 make update                            # guided update (same safe flow as setup)
 make status                            # read-only installation status

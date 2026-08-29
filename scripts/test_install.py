@@ -8,6 +8,7 @@ are checked here against a throwaway directory.
 
 import base64
 import os
+import subprocess
 import sys
 import tempfile
 import urllib.error
@@ -471,6 +472,19 @@ with tempfile.TemporaryDirectory() as tmp:
     found = install.scan_project(root, {})
     check("same-version content differences are not reported as current",
           found is not None and found.has_update(bundled))
+
+setup_script = install.REPO / "setup.sh"
+completed = subprocess.run(
+    ["bash", str(setup_script), "--help"],
+    capture_output=True,
+    text=True,
+    cwd=tempfile.gettempdir(),
+)
+check("setup.sh is executable and reaches the installer",
+      os.access(setup_script, os.X_OK)
+      and completed.returncode == 0
+      and "usage: install.py" in completed.stdout,
+      completed.stderr or completed.stdout)
 
 print(f"\ninstall: {'ok' if not failures else f'{failures} failures'}")
 sys.exit(1 if failures else 0)
