@@ -7,6 +7,8 @@ are checked here against a throwaway directory.
 """
 
 import base64
+import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -89,7 +91,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
 with tempfile.TemporaryDirectory() as tmp:
     home = Path(tmp)
-    report = install.install(["claude", "codex"], home, home)
+    report = install.install(list(install.TOOLS), home, home)
     source = install.user_source(home)
     check("user installs keep a managed baseline outside the checkout",
           source.is_file() and source.resolve() != install.SOURCE.resolve())
@@ -99,6 +101,9 @@ with tempfile.TemporaryDirectory() as tmp:
           f"@{source}" in (home / ".claude" / "CLAUDE.md").read_text().splitlines())
     check("Codex's user instructions read the managed baseline",
           (home / ".codex" / "AGENTS.md").resolve() == source.resolve(), str(report))
+    check("Copilot's user instructions read the managed baseline",
+          (home / ".copilot" / "copilot-instructions.md").resolve()
+          == source.resolve(), str(report))
 
 with tempfile.TemporaryDirectory() as tmp:
     home = Path(tmp)
@@ -143,6 +148,85 @@ check("guided tool selection clearly supports multiple tools",
       and any("comma-separated" in prompt and "Enter = all" in prompt
               for prompt in tool_prompts),
       f"prompts={tool_prompts!r}, output={tool_output!r}")
+all_tools = install.choose_tools(lambda _prompt: "", lambda _line: None, install.TOOLS)
+check("guided setup defaults to all three tools", all_tools == list(install.TOOLS))
+hook_output: list[str] = []
+hook_prompts: list[str] = []
+hook_tools = install.choose_hook_tools(
+    lambda prompt: hook_prompts.append(prompt) or "1,3",
+    hook_output.append,
+    list(install.TOOLS),
+)
+check("startup hooks can target a subset of the installed tools",
+      hook_tools == ["claude", "copilot"]
+      and any("Enter = none" in prompt for prompt in hook_prompts),
+      f"prompts={hook_prompts!r}, output={hook_output!r}")
+no_hook_tools = install.choose_hook_tools(
+    lambda _prompt: "", lambda _line: None, list(install.TOOLS)
+)
+check("startup hooks remain optional by default", no_hook_tools == [])
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    install.install(list(install.TOOLS), root, None)
+    claude_settings = root / ".claude" / "settings.json"
+    claude_settings.write_text(
+        '{"permissions":{"ask":["Edit(/specs/**)"]}}\n', encoding="utf-8"
+    )
+    hook_report = install.install_version_hooks(list(install.TOOLS), root, None)
+    helper = install.version_hook_path(root, None)
+    claude_config = json.loads(claude_settings.read_text(encoding="utf-8"))
+    codex_config = json.loads(
+        (root / ".codex" / "hooks.json").read_text(encoding="utf-8")
+    )
+    copilot_config = json.loads(
+        (root / ".github" / "hooks" / install.COPILOT_VERSION_HOOK_NAME).read_text(
+            encoding="utf-8"
+        )
+    )
+    check("version hooks are installed for all three project tools",
+          helper.is_file()
+          and "SessionStart" in claude_config["hooks"]
+          and "SessionStart" in codex_config["hooks"]
+          and "sessionStart" in copilot_config["hooks"], str(hook_report))
+    check("the Claude hook merge preserves existing settings",
+          claude_config.get("permissions")
+          == {"ask": ["Edit(/specs/**)"]}, str(claude_config))
+    json_banner = subprocess.run(
+        [sys.executable, str(helper), "--output", "json"],
+        capture_output=True,
+        text=True,
+        cwd=root,
+    )
+    plain_banner = subprocess.run(
+        [sys.executable, str(helper), "--output", "message"],
+        capture_output=True,
+        text=True,
+        cwd=root,
+    )
+    check("the shared hook helper reports the installed baseline ID",
+          json_banner.returncode == 0
+          and "Baseline active:" in json.loads(json_banner.stdout)["systemMessage"]
+          and json.loads(json_banner.stdout)["systemMessage"].endswith(
+              install.bundled_baseline().baseline_id
+          )
+          and plain_banner.stdout.strip().endswith(
+              install.bundled_baseline().baseline_id
+          ), json_banner.stderr or plain_banner.stderr)
+    again = install.install_version_hooks(list(install.TOOLS), root, None)
+    check("installing the version hooks twice is idempotent",
+          all(line.startswith("in place") for line in again), str(again))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    install.install(["claude"], root, None)
+    settings = root / ".claude" / "settings.json"
+    invalid = b'{"hooks": {"SessionStart": []}, "hooks": {}}\n'
+    settings.write_bytes(invalid)
+    report = install.install_version_hooks(["claude"], root, None)
+    check("ambiguous existing hook settings are not overwritten",
+          settings.read_bytes() == invalid
+          and any(line.startswith("blocked") for line in report), str(report))
 
 bundled = install.bundled_baseline()
 check("the checkout installer uses the canonical upstream",
@@ -287,7 +371,7 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     state = home / "state.json"
-    answers = iter(["3", ""])
+    answers = iter(["3", "", "all"])
     output: list[str] = []
     result = install.interactive_setup(
         home=home,
@@ -300,10 +384,14 @@ with tempfile.TemporaryDirectory() as tmp:
     check("guided setup can install all supported user tools",
           result == 0
           and install.user_source(home).is_file()
-          and (home / ".codex" / "AGENTS.md").is_symlink(), str(output))
-    check("user-wide setup explains the Copilot project limitation",
-          any("GitHub Copilot" in line and "project" in line for line in output),
+          and (home / ".codex" / "AGENTS.md").is_symlink()
+          and (home / ".copilot" / "copilot-instructions.md").is_symlink(),
           str(output))
+    check("guided setup can add user-wide startup hooks for all three tools",
+          (home / ".claude" / "settings.json").is_file()
+          and (home / ".codex" / "hooks.json").is_file()
+          and (home / ".copilot" / "hooks"
+               / install.COPILOT_VERSION_HOOK_NAME).is_file(), str(output))
     state_mode = os.stat(state).st_mode & 0o777 if state.exists() else None
     check("guided setup records known installation locations",
           state.is_file() and state_mode == 0o600, str(state_mode))
@@ -364,7 +452,7 @@ with tempfile.TemporaryDirectory() as tmp:
     install.record_installation(registry, previous, trusted=True)
     state = sandbox / "state.json"
     install.save_registry(state, registry)
-    answers = iter(["", "1", "2"])
+    answers = iter(["", "1", "2", "n"])
     prompts = []
     output = []
 
@@ -451,7 +539,7 @@ with tempfile.TemporaryDirectory() as tmp:
         bundled.baseline_id.encode(), b"aisec-0.0.1", 1
     )
     (target / install.BASELINE).write_bytes(old_content)
-    answers = iter(["2", str(target), "", "y", "2"])
+    answers = iter(["2", str(target), "", "y", "2", "n"])
     output = []
     result = install.interactive_setup(
         home=home,
@@ -477,6 +565,10 @@ with tempfile.TemporaryDirectory() as tmp:
           found is not None and found.has_update(bundled))
 
 setup_script = install.REPO / "setup.sh"
+setup_digest = hashlib.sha256(setup_script.read_bytes()).hexdigest()
+readme = (install.REPO / "README.md").read_text(encoding="utf-8")
+check("the quick start pins the exact remote bootstrap content",
+      f"echo '{setup_digest}  aisec-setup.sh' | sha256sum --check" in readme)
 completed = subprocess.run(
     ["bash", str(setup_script), "--help"],
     capture_output=True,
@@ -488,6 +580,54 @@ check("setup.sh is executable and reaches the installer",
       and completed.returncode == 0
       and "usage: install.py" in completed.stdout,
       completed.stderr or completed.stdout)
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    remote_setup = sandbox / "remote-setup.sh"
+    remote_setup.write_bytes(setup_script.read_bytes())
+    remote_setup.chmod(0o755)
+    mock_bin = sandbox / "bin"
+    mock_bin.mkdir()
+    mock_curl = mock_bin / "curl"
+    mock_curl.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "output=\n"
+        "url=\n"
+        "while [ \"$#\" -gt 0 ]; do\n"
+        "  case \"$1\" in\n"
+        "    --output) output=$2; shift 2 ;;\n"
+        "    --proto|--max-time) shift 2 ;;\n"
+        "    --fail|--silent|--show-error) shift ;;\n"
+        "    *) url=$1; shift ;;\n"
+        "  esac\n"
+        "done\n"
+        "case \"$url\" in\n"
+        "  */branches/main)\n"
+        "    printf '{\"commit\":{\"sha\":\"%s\"}}\\n' \"$AISEC_TEST_REF\" ;;\n"
+        "  */\"$AISEC_TEST_REF\"/*)\n"
+        "    path=${url#*\"$AISEC_TEST_REF\"/}\n"
+        "    cp \"$AISEC_TEST_REPO/$path\" \"$output\" ;;\n"
+        "  *)\n"
+        "    echo \"unexpected URL: $url\" >&2; exit 1 ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    mock_curl.chmod(0o755)
+    environment = os.environ.copy()
+    environment["PATH"] = f"{mock_bin}{os.pathsep}{environment['PATH']}"
+    environment["AISEC_TEST_REF"] = "a" * 40
+    environment["AISEC_TEST_REPO"] = str(install.REPO)
+    remote = subprocess.run(
+        ["sh", str(remote_setup), "--help"],
+        capture_output=True,
+        text=True,
+        cwd=sandbox,
+        env=environment,
+    )
+    check("setup.sh bootstraps a commit-pinned installer without a checkout",
+          remote.returncode == 0 and "usage: install.py" in remote.stdout,
+          remote.stderr or remote.stdout)
 
 print(f"\ninstall: {'ok' if not failures else f'{failures} failures'}")
 sys.exit(1 if failures else 0)

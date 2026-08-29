@@ -8,6 +8,7 @@ import json
 import os
 import re
 import secrets
+import shlex
 import stat
 import sys
 import tempfile
@@ -22,6 +23,10 @@ from typing import Callable
 REPO = Path(__file__).resolve().parent.parent
 BASELINE = "secure-coding-baseline.md"
 SOURCE = REPO / BASELINE
+VERSION_HOOK_SOURCE = REPO / "scripts" / "show_baseline_version.py"
+VERSION_HOOK_DIR = ".ai-secure-coding-baseline"
+VERSION_HOOK_NAME = "show-baseline-version.py"
+COPILOT_VERSION_HOOK_NAME = "aisec-baseline-version.json"
 TOOLS = ("claude", "codex", "copilot")
 TOOL_LABELS = {
     "claude": "Claude Code",
@@ -43,6 +48,7 @@ MAX_BASELINE_BYTES = 256 * 1024
 MAX_INSTRUCTION_BYTES = 512 * 1024
 MAX_API_BYTES = 512 * 1024
 MAX_REGISTRY_BYTES = 128 * 1024
+MAX_HOOK_CONFIG_BYTES = 128 * 1024
 MAX_PROJECTS = 200
 MAX_COLUMN = 40
 REGISTRY_SCHEMA = 1
@@ -340,7 +346,7 @@ def user_targets(home: Path) -> dict[str, list[tuple[str, Path]]]:
             ("import_line", home / ".claude" / "CLAUDE.md"),
         ],
         "codex": [("link", home / ".codex" / "AGENTS.md")],
-        "copilot": [],
+        "copilot": [("link", home / ".copilot" / "copilot-instructions.md")],
     }
 
 
@@ -496,6 +502,220 @@ def install(
     return report
 
 
+def version_hook_path(root: Path, home: Path | None) -> Path:
+    if home is not None:
+        return user_data_root(home) / VERSION_HOOK_NAME
+    return root / VERSION_HOOK_DIR / VERSION_HOOK_NAME
+
+
+def _place_version_hook(root: Path, home: Path | None, report: list[str]) -> Path | None:
+    target = version_hook_path(root, home)
+    content = read_limited(VERSION_HOOK_SOURCE, MAX_BASELINE_BYTES)
+    if target.is_symlink():
+        report.append(f"blocked {target}: is a symlink")
+        return None
+    if target.exists():
+        if not target.is_file():
+            report.append(f"blocked {target}: is not a regular file")
+            return None
+        try:
+            current = read_limited(target, MAX_BASELINE_BYTES)
+        except (OSError, ValueError):
+            report.append(f"blocked {target}: cannot safely read existing hook helper")
+            return None
+        if current != content:
+            report.append(f"blocked {target}: contains different hook helper code")
+            return None
+        report.append(f"in place {target}")
+        return target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _write_new(target, content)
+    report.append(f"added {target}")
+    return target
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _read_hook_config(path: Path) -> tuple[dict[str, object], bool]:
+    if path.is_symlink():
+        raise ValueError("configuration is a symlink")
+    if not path.exists():
+        return {}, False
+    if not path.is_file():
+        raise ValueError("configuration is not a regular file")
+    content = read_limited(path, MAX_HOOK_CONFIG_BYTES)
+    parsed = json.loads(content.decode("utf-8"), object_pairs_hook=_unique_json_object)
+    if not isinstance(parsed, dict):
+        raise ValueError("configuration is not a JSON object")
+    return parsed, True
+
+
+def _write_hook_config(path: Path, config: dict[str, object], existed: bool) -> None:
+    payload = (json.dumps(config, indent=2, ensure_ascii=False) + "\n").encode()
+    if len(payload) > MAX_HOOK_CONFIG_BYTES:
+        raise ValueError("hook configuration is too large")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if existed:
+        _atomic_replace(path, payload)
+    else:
+        _write_new(path, payload)
+
+
+def _install_merged_version_hook(
+    path: Path,
+    event: str,
+    entry: dict[str, object],
+    report: list[str],
+) -> None:
+    try:
+        config, existed = _read_hook_config(path)
+        hooks = config.setdefault("hooks", {})
+        if not isinstance(hooks, dict):
+            raise ValueError("hooks is not an object")
+        entries = hooks.setdefault(event, [])
+        if not isinstance(entries, list):
+            raise ValueError(f"{event} is not a list")
+        if entry in entries:
+            report.append(f"in place {path}")
+            return
+        if VERSION_HOOK_NAME in json.dumps(entries, ensure_ascii=False):
+            report.append(f"blocked {path}: contains a different baseline version hook")
+            return
+        entries.append(entry)
+        _write_hook_config(path, config, existed)
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+        report.append(f"blocked {path}: cannot safely merge the version hook")
+        return
+    report.append(f"updated {path}" if existed else f"wrote {path}")
+
+
+def _powershell_quote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _claude_version_hook(helper: Path, project: bool) -> dict[str, object]:
+    script = (
+        f"${{CLAUDE_PROJECT_DIR}}/{VERSION_HOOK_DIR}/{VERSION_HOOK_NAME}"
+        if project
+        else str(helper)
+    )
+    return {
+        "matcher": "startup|resume|fork",
+        "hooks": [
+            {
+                "type": "command",
+                "command": "python3",
+                "args": [script, "--output", "json"],
+                "timeout": 5,
+            }
+        ],
+    }
+
+
+def _codex_version_hook(helper: Path, project: bool) -> dict[str, object]:
+    if project:
+        relative = f"{VERSION_HOOK_DIR}/{VERSION_HOOK_NAME}"
+        command = f'python3 "$(git rev-parse --show-toplevel)/{relative}" --output json'
+        command_windows = (
+            f'py -3 "$(git rev-parse --show-toplevel)/{relative}" --output json'
+        )
+    else:
+        command = f"python3 {shlex.quote(str(helper))} --output json"
+        command_windows = f"py -3 {_powershell_quote(str(helper))} --output json"
+    return {
+        "matcher": "startup|resume",
+        "hooks": [
+            {
+                "type": "command",
+                "command": command,
+                "commandWindows": command_windows,
+                "timeout": 5,
+            }
+        ],
+    }
+
+
+def _copilot_version_config(helper: Path, project: bool) -> dict[str, object]:
+    if project:
+        script = f"{VERSION_HOOK_DIR}/{VERSION_HOOK_NAME}"
+        bash = f"python3 {shlex.quote(script)} --output message"
+        powershell = f"py -3 {_powershell_quote(script)} --output message"
+        cwd: str | None = "."
+    else:
+        bash = f"python3 {shlex.quote(str(helper))} --output message"
+        powershell = f"py -3 {_powershell_quote(str(helper))} --output message"
+        cwd = None
+    hook: dict[str, object] = {
+        "type": "command",
+        "bash": bash,
+        "powershell": powershell,
+        "timeoutSec": 5,
+    }
+    if cwd is not None:
+        hook["cwd"] = cwd
+    return {"version": 1, "hooks": {"sessionStart": [hook]}}
+
+
+def _install_copilot_version_hook(
+    path: Path, config: dict[str, object], report: list[str]
+) -> None:
+    try:
+        current, existed = _read_hook_config(path)
+        if existed:
+            if current == config:
+                report.append(f"in place {path}")
+            else:
+                report.append(f"blocked {path}: contains different hook configuration")
+            return
+        _write_hook_config(path, config, False)
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+        report.append(f"blocked {path}: cannot safely install the version hook")
+        return
+    report.append(f"wrote {path}")
+
+
+def install_version_hooks(
+    tools: list[str], root: Path, home: Path | None
+) -> list[str]:
+    report: list[str] = []
+    helper = _place_version_hook(root, home, report)
+    if helper is None:
+        return report
+    project = home is None
+    for tool in tools:
+        if tool == "claude":
+            settings = (root / ".claude" / "settings.json") if project else (
+                home / ".claude" / "settings.json"
+            )
+            _install_merged_version_hook(
+                settings, "SessionStart", _claude_version_hook(helper, project), report
+            )
+        elif tool == "codex":
+            settings = (root / ".codex" / "hooks.json") if project else (
+                home / ".codex" / "hooks.json"
+            )
+            _install_merged_version_hook(
+                settings, "SessionStart", _codex_version_hook(helper, project), report
+            )
+        elif tool == "copilot":
+            settings = (
+                root / ".github" / "hooks" / COPILOT_VERSION_HOOK_NAME
+                if project
+                else home / ".copilot" / "hooks" / COPILOT_VERSION_HOOK_NAME
+            )
+            _install_copilot_version_hook(
+                settings, _copilot_version_config(helper, project), report
+            )
+    return report
+
+
 def registry_path(home: Path) -> Path:
     return home / ".config" / "ai-secure-coding-baseline" / "installations.json"
 
@@ -627,10 +847,11 @@ def scan_user(home: Path, user_entry: object = None) -> list[Installation]:
         if _import_contains(targets["claude"][1][1], source):
             sources.setdefault(source, set()).add("claude")
 
-    codex_link = targets["codex"][0][1]
-    if codex_link.is_symlink():
-        source = codex_link.resolve(strict=False)
-        sources.setdefault(source, set()).add("codex")
+    for tool in ("codex", "copilot"):
+        link = targets[tool][0][1]
+        if link.is_symlink():
+            source = link.resolve(strict=False)
+            sources.setdefault(source, set()).add(tool)
 
     managed_path = user_source(home)
     managed = managed_path.resolve(strict=False)
@@ -676,20 +897,21 @@ def scan_user(home: Path, user_entry: object = None) -> list[Installation]:
             )
             seen.add(claude_file.resolve(strict=False))
 
-    codex_file = targets["codex"][0][1]
-    if (
-        codex_file.is_file()
-        and not codex_file.is_symlink()
-        and codex_file.resolve(strict=False) not in seen
-    ):
-        try:
-            baseline = read_baseline(codex_file)
-        except (OSError, ValueError):
-            pass
-        else:
+    for tool in ("codex", "copilot"):
+        instruction_file = targets[tool][0][1]
+        if (
+            instruction_file.is_file()
+            and not instruction_file.is_symlink()
+            and instruction_file.resolve(strict=False) not in seen
+        ):
+            try:
+                baseline = read_baseline(instruction_file)
+            except (OSError, ValueError):
+                continue
             installations.append(
-                Installation("unmanaged", home, codex_file, baseline, ("codex",))
+                Installation("unmanaged", home, instruction_file, baseline, (tool,))
             )
+            seen.add(instruction_file.resolve(strict=False))
     return installations
 
 
@@ -966,6 +1188,42 @@ def choose_tools(
     return None
 
 
+def choose_hook_tools(
+    input_fn: Callable[[str], str],
+    output: Callable[[str], None],
+    tools: list[str],
+) -> list[str]:
+    output("\nOptional startup hook:")
+    output("Show the active baseline and version when these tools start:")
+    for number, tool in enumerate(tools, 1):
+        output(f"  {number}. {TOOL_LABELS[tool]}")
+    for _ in range(3):
+        answer = _read_answer(
+            input_fn,
+            "Hook tools (comma-separated; Enter = none, all = all shown): ",
+        )
+        if not answer or answer.lower() in {"n", "no", "none"}:
+            return []
+        if answer.lower() == "all":
+            return list(tools)
+        chosen: list[str] = []
+        valid = True
+        for item in re.split(r"[\s,]+", answer.lower()):
+            if item.isdigit() and 1 <= int(item) <= len(tools):
+                tool = tools[int(item) - 1]
+            elif item in tools:
+                tool = item
+            else:
+                valid = False
+                break
+            if tool not in chosen:
+                chosen.append(tool)
+        if valid and chosen:
+            return chosen
+        output("Invalid selection. Use shown numbers, tool names, all, or none.")
+    return []
+
+
 def _path_from_answer(answer: str, home: Path) -> Path:
     if answer == "~":
         candidate = home
@@ -1165,6 +1423,26 @@ def _review_updates(
     return changed
 
 
+def _offer_version_hooks(
+    selected_tools: list[str],
+    installed: Installation | None,
+    root: Path,
+    home: Path | None,
+    input_fn: Callable[[str], str],
+    output: Callable[[str], None],
+) -> None:
+    if installed is None:
+        return
+    tools = [tool for tool in selected_tools if tool in installed.tools]
+    if not tools:
+        return
+    hook_tools = choose_hook_tools(input_fn, output, tools)
+    if not hook_tools:
+        return
+    for line in install_version_hooks(hook_tools, root, home):
+        output(line)
+
+
 def _install_project_interactively(
     home: Path,
     registry: dict[str, object],
@@ -1220,6 +1498,7 @@ def _install_project_interactively(
     entry = projects.get(str(root)) if isinstance(projects, dict) else None
     installed = scan_project(root, entry if isinstance(entry, dict) else {})
     _record_current_scope(registry, installed, available)
+    _offer_version_hooks(tools, installed, root, None, input_fn, output)
     return changed or installed is not None
 
 
@@ -1261,11 +1540,7 @@ def _install_user_interactively(
                 record_installation(registry, migrated, trusted=True)
                 changed = True
 
-    output(
-        "\nGitHub Copilot has no local user-wide setup target; "
-        "install it for a project or configure account instructions manually."
-    )
-    tools = choose_tools(input_fn, output, ("claude", "codex"))
+    tools = choose_tools(input_fn, output, TOOLS)
     if not tools:
         output("Setup cancelled.")
         return changed
@@ -1281,6 +1556,7 @@ def _install_user_interactively(
     ]
     if managed:
         _record_current_scope(registry, managed[0], available)
+        _offer_version_hooks(tools, managed[0], Path.cwd(), home, input_fn, output)
         return True
     return changed
 

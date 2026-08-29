@@ -13,7 +13,10 @@ open it, or the rules are not in your context at all.
 Four limits from it bind every edit to the baseline text:
 
 - It stays compact. Size is a criterion, not only correctness; the README states
-  the current budget.
+  the current budget. After every change to `secure-coding-baseline.md`,
+  recompute its file size and GPT token count with the `o200k_base` encoding and
+  update both values in `README.md`; never carry the previous measurements
+  forward by assumption.
 - It stays tool-neutral. The same text ships to Claude Code, Copilot, Codex, and
   anything else that reads an `AGENTS.md`, so no rule may depend on one tool.
 - Every rule names a mechanism, not a goal. "Authorize on the server" works;
@@ -56,6 +59,14 @@ harness. It calls no model, takes seconds, and also holds this file to its own
 contract: `AGENTS.md` must require agents to read and follow the baseline
 through the reference above, must not carry a generated copy of it, and
 `CLAUDE.md` must import both files exactly once.
+
+The remote quick start treats `setup.sh` as a content-pinned bootstrap. Whenever
+`setup.sh` changes, recompute its SHA-256 and update the inline value in
+`README.md`; `scripts/test_install.py` enforces that match. When the download URL
+is pinned to a bootstrap commit rather than `main`, it must name the commit that
+contains that exact `setup.sh`, and a changed bootstrap requires both a new
+commit reference and a new SHA-256. Because the commit is only known after it is
+created, make that URL update in a follow-up documentation commit.
 
 `make test` and `make test-all` are a different matter: they run the cases
 against real models. The full matrix is 60 runs and several hours of tokens.

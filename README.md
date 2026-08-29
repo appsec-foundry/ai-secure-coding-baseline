@@ -31,15 +31,14 @@ formally certified.
 ## Quick start
 
 ```bash
-git clone https://github.com/appsec-foundry/ai-secure-coding-baseline
-cd ai-secure-coding-baseline
-./setup.sh          # same guided flow as: make setup
+curl --proto '=https' --fail --silent --show-error --output aisec-setup.sh https://raw.githubusercontent.com/appsec-foundry/ai-secure-coding-baseline/main/setup.sh && echo '0a47d6ebaef4b86867d1e75867213689863daf7e72da1ba2b97ddd54f7046441  aisec-setup.sh' | sha256sum --check && bash aisec-setup.sh
 ```
 
-The installer asks for scope and tools, keeps existing instruction files, and
-runs again for updates. Without a checkout, use the
-[installer skill](#installer-skill-no-checkout). All other paths are under
-[Using it](#using-it).
+This needs no checkout. The bootstrap resolves the current `main` commit once,
+downloads the installer inputs from that exact commit into a temporary
+directory, and starts the guided setup. It asks for scope and tools, keeps
+existing instruction files, and runs again for updates. All other paths are
+under [Using it](#using-it).
 
 ## Why this exists
 
@@ -177,6 +176,20 @@ possible, and copy it only when necessary. The sections below cover Claude Code,
 GitHub Copilot, and agents that use [`AGENTS.md`](https://agents.md/) at project,
 user, and organization level.
 
+### Remote setup (no checkout)
+
+The quick-start command downloads the upstream setup script, verifies its
+published SHA-256, and runs it only when that check succeeds. The inline hash
+pins the bootstrap content even while its URL uses `main`; it changes only when
+`setup.sh` itself changes. After startup, the script pins the current `main`
+commit and downloads the guided installer, baseline, and version-hook helper
+only from that commit. It requires Bash, `curl`, `sha256sum`, and Python 3 and
+deletes its temporary downloads on exit. The verified `aisec-setup.sh` remains
+available for inspection or manual deletion.
+
+For a path that does not execute remotely downloaded code, use the installer
+skill below. A repository clone is also supported.
+
 ### Installer skill (no checkout)
 
 Skill-capable agents can install
@@ -220,8 +233,22 @@ guided flow with the more discoverable update name. It shows the current
 project, the supported user-level locations, and projects managed by earlier
 runs.
 Choose a scope, then select tools by number or name; press Enter to select all
-tools shown. Copilot is available for projects only. Its account-level custom
-instructions must be configured manually.
+tools shown. Project installs support Claude Code, Codex, and GitHub Copilot.
+User-wide installs support Claude Code, Codex, and Copilot CLI; Copilot account
+instructions for other surfaces must still be configured in the corresponding
+GitHub or IDE settings.
+
+After installing the selected tools, the guided setup offers an optional
+session-start hook separately for any subset of those tools; Enter selects no
+hooks, while `all` selects every tool shown. The hook displays the active
+`baseline-id` and reads the managed baseline on every start, so a later baseline
+update is reflected without rewriting the hook. Existing hook settings are
+merged only when they are valid; unrelated or ambiguous files are left
+untouched. Claude Code and Codex show a native system message, while Copilot CLI
+prints a startup banner. Project-level Copilot hooks also run in the cloud
+agent, but that non-interactive environment has no user-facing startup display.
+Codex requires review and trust for a new or changed hook; use `/hooks` when
+Codex reports that review is pending.
 
 The installer uses the latest published release when available and otherwise
 uses the copy in the checkout. Pass `ARGS=--offline` to skip the release check.
