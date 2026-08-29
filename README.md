@@ -178,6 +178,17 @@ Each rule requires a concrete mechanism, not a general goal.
 | Riskier design choice | `AISEC-OM-005` | Explain the concrete risk, safer option, and cost, then require explicit confirmation before implementing the riskier choice. |
 | Before completion | `AISEC-REPORT-001` | Inspect the changed diff and tests, fix introduced findings, and reserve the baseline security note for concrete material risks the delivered state creates or worsens. |
 
+**Scope:** In an existing application, apply the rules to changed code and its
+directly affected interfaces; reuse existing controls and avoid unrelated
+retrofits. For a new application or component, establish and verify every
+applicable control, configuration, and test from the start. If unclear, ask.
+
+**Confirmation versus reporting:** Ask before implementation only for a
+deliberate control override or materially riskier design choice. A **Security
+note (AISEC baseline)** is separate and appears only when the delivered result
+creates or worsens a qualifying material risk; asking does not itself warrant a
+note, and a note can appear without a prior confirmation.
+
 See [`specs/requirements.md`](specs/requirements.md) for applicability,
 acceptance criteria, and test coverage.
 
