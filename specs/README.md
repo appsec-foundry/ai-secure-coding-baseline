@@ -1,13 +1,13 @@
 # How the baseline changes
 
-`secure-coding-baseline.md` in the repository root is the product — one file,
+`secure-coding-baseline.md` in the repository root is the product: one file,
 shipped to coding assistants as it is. Nothing under `specs/` is normative for
 an assistant; it only records what the baseline contains and how it changes.
 
-- `requirements.md` — a readable catalog of the current rule groups, acceptance
+- `requirements.md`: a readable catalog of the current rule groups, acceptance
   criteria, model evidence, and known gaps.
-- `changes/<name>/` — a change being worked on.
-- `archive/<date>-<name>/` — a change that is finished.
+- `changes/<name>/`: a change being worked on.
+- `archive/<date>-<name>/`: a change that is finished.
 
 ## Where requirements come from
 
@@ -28,18 +28,18 @@ test-only changes do not get a change directory while the normative baseline
 stays unchanged. Typos and rewrapping do not need one either. If you cannot tell
 whether new baseline wording changes behavior, assume it does.
 
-A change directory holds three short files — templates in `changes/README.md`,
+A change directory holds three short files (templates in `changes/README.md`,
 worked examples in `archive/`, the smallest being
-`2026-08-15-reference-baseline-from-agents/`:
+`2026-08-15-reference-baseline-from-agents/`):
 
-- `proposal.md` — problem, goal, non-goals, what it breaks.
-- `requirements.md` — what the baseline must do, with a source per requirement.
-- `tasks.md` — the work, ticked off as it happens.
+- `proposal.md`: problem, goal, non-goals, what it breaks.
+- `requirements.md`: what the baseline must do, with a source per requirement.
+- `tasks.md`: the work, ticked off as it happens.
 
 ## Running a change
 
-1. Propose the change — its requirements, their sources, and the files they land
-   in — and wait for the user's answer. Nothing under `specs/` is written before
+1. Propose the change (its requirements, their sources, and the files they land
+   in) and wait for the user's answer. Nothing under `specs/` is written before
    that answer; `scripts/spec_guard.py` turns identifiable writes into a
    permission prompt.
 2. Write the three files.
@@ -55,15 +55,15 @@ worked examples in `archive/`, the smallest being
 Every rule group in the baseline carries an ID like `AISEC-AUTH-001`. The ID
 belongs to the behavior, not to the heading or the line: reword the rule and it
 keeps its ID. Split a group and the new half gets a new ID. Remove a group and
-its ID retires — never reuse it.
+its ID retires; never reuse it.
 
 A change directory numbers its own requirements, and those IDs stay inside it:
 only its `proposal.md` and `tasks.md` refer to them. Two changes may therefore
-carry the same ID for different requirements — `AGENT-SDD-001` does, in
+carry the same ID for different requirements, because `make check` keeps IDs
+unique within a file, not across the archive. `AGENT-SDD-001` does, in
 `archive/2026-08-15-load-baseline-for-agents/` and
-`archive/2026-08-15-anchor-sdd-agent-instructions/` — because `make check` keeps
-IDs unique within a file, not across the archive. Only baseline IDs are unique
-for good.
+`archive/2026-08-15-anchor-sdd-agent-instructions/`. Only baseline IDs are
+unique for good.
 
 Test cases name the IDs they exercise in their `checks.json`. A rule group
 without a case is not automatically a gap, and not automatically fine. Add a

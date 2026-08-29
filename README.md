@@ -158,11 +158,11 @@ Each rule requires a concrete mechanism, not a general goal.
 
 **Workflow rules**
 
-- **Existing application — change-scoped** (`AISEC-OM-001`): apply the baseline
+- **Existing application, change-scoped** (`AISEC-OM-001`): apply the baseline
   to the code being changed and its directly affected interfaces. Reuse the
   application's established patterns and security mechanisms, make the smallest
   compliant change, and avoid unrelated retrofits.
-- **Greenfield application or component — creation-scoped** (`AISEC-OM-002`):
+- **Greenfield application or component, creation-scoped** (`AISEC-OM-002`):
   apply the baseline to all code and interfaces being created. Establish every
   applicable control, secure configuration, and test as part of the design, and
   verify them before the first production release.
