@@ -1212,19 +1212,19 @@ def choose_hook_tools(
     output: Callable[[str], None],
     tools: list[str],
 ) -> list[str]:
-    output("\nOptional startup hook:")
-    output("Show the active baseline and version when these tools start:")
+    output("\nStartup hook:")
+    output("Show the active baseline and version for the selected installation:")
     for number, tool in enumerate(tools, 1):
         output(f"  {number}. {TOOL_LABELS[tool]}")
     for _ in range(3):
         answer = _read_answer(
             input_fn,
-            "Hook tools (comma-separated; Enter = none, all = all shown): ",
+            "Hook tools (comma-separated; Enter = all shown; none = skip): ",
         )
-        if not answer or answer.lower() in {"n", "no", "none"}:
-            return []
-        if answer.lower() == "all":
+        if not answer or answer.lower() == "all":
             return list(tools)
+        if answer.lower() in {"n", "no", "none"}:
+            return []
         chosen: list[str] = []
         valid = True
         for item in re.split(r"[\s,]+", answer.lower()):

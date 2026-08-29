@@ -236,17 +236,17 @@ Code, Codex, and GitHub Copilot. User-wide installs support Claude Code, Codex,
 and Copilot CLI; Copilot account instructions for other surfaces must still be
 configured in the corresponding GitHub or IDE settings.
 
-After installing the selected tools, the guided setup offers an optional
-session-start hook separately for any subset of those tools; Enter selects no
-hooks, while `all` selects every tool shown. The hook displays the active
-`baseline-id` and reads the managed baseline on every start, so a later baseline
-update is reflected without rewriting the hook. Existing hook settings are
-merged only when they are valid; unrelated or ambiguous files are left
-untouched. Claude Code and Codex show a native system message, while Copilot CLI
-prints a startup banner. Project-level Copilot hooks also run in the cloud
-agent, but that non-interactive environment has no user-facing startup display.
-Codex requires review and trust for a new or changed hook; use `/hooks` when
-Codex reports that review is pending.
+After installing the selected tools, the guided setup offers a session-start
+hook for those tools. Only tools selected for that scope are listed. Enter
+enables the hook for every tool shown; enter `none` to skip it or select a
+subset. The hook displays the active `baseline-id` and reads the managed
+baseline on every start, so a later baseline update is reflected without
+rewriting the hook. Existing hook settings are merged only when they are valid;
+unrelated or ambiguous files are left untouched. Claude Code and Codex show a
+native system message, while Copilot CLI prints a startup banner. Project-level
+Copilot hooks also run in the cloud agent, but that non-interactive environment
+has no user-facing startup display. Codex requires review and trust for a new or
+changed hook; use `/hooks` when Codex reports that review is pending.
 
 The installer uses the latest published release when available and otherwise
 uses the copy in the checkout. Pass `ARGS=--offline` to skip the release check.

@@ -170,12 +170,17 @@ hook_tools = install.choose_hook_tools(
 )
 check("startup hooks can target a subset of the installed tools",
       hook_tools == ["claude", "copilot"]
-      and any("Enter = none" in prompt for prompt in hook_prompts),
+      and any("Enter = all shown" in prompt for prompt in hook_prompts),
       f"prompts={hook_prompts!r}, output={hook_output!r}")
-no_hook_tools = install.choose_hook_tools(
+default_hook_tools = install.choose_hook_tools(
     lambda _prompt: "", lambda _line: None, list(install.TOOLS)
 )
-check("startup hooks remain optional by default", no_hook_tools == [])
+check("startup hooks default to all selected tools",
+      default_hook_tools == list(install.TOOLS))
+no_hook_tools = install.choose_hook_tools(
+    lambda _prompt: "none", lambda _line: None, list(install.TOOLS)
+)
+check("startup hooks can be skipped explicitly", no_hook_tools == [])
 
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
@@ -382,7 +387,7 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     state = home / "state.json"
-    answers = iter(["3", "", "all"])
+    answers = iter(["3", "", ""])
     output: list[str] = []
     result = install.interactive_setup(
         home=home,
