@@ -56,30 +56,22 @@ sessions without repeating them in every prompt.
 
 ## Background
 
-AI coding assistants produce safer code when security expectations are stated
-as clear, concrete instructions. General project descriptions or a request to
-"be security-aware" are less reliable. That is why every rule in this baseline
-names an action, such as authorizing on the server or using parameterized
-queries, rather than a broad goal
+AI coding assistants produce safer, more consistent code when security
+expectations are explicit, concrete, and present throughout the task.
+"Authorize on the server" names a mechanism an assistant can apply; "be
+security-aware" does not. That is why this baseline uses actionable rules
+rather than broad goals
 ([Yan et al., 2025](https://arxiv.org/abs/2506.23034),
 [Gloaguen et al., 2026](https://arxiv.org/abs/2602.11988),
 [Kharma et al., 2026](https://arxiv.org/abs/2605.24298)).
 
-Instruction files provide behavioral guidance: they influence what an agent is
-likely to do, but they do not enforce a policy. Agents tend to follow clear
-instructions, yet compliance is not guaranteed. Under repeated user pressure,
-for example, explicit rules reduced shortcut behavior to 8.3%, not to zero
+Instruction files steer behavior; they do not enforce policy. Under repeated
+user pressure, explicit rules reduced shortcut behavior to 8.3%, not zero
 ([Gloaguen et al., 2026](https://arxiv.org/abs/2602.11988),
-[Chen et al., 2026](https://arxiv.org/abs/2604.20200)).
-
-Security requirements that must not be violated need controls outside the
-model. Use permission boundaries to restrict actions, deterministic guards for
-violations they can judge reliably, and tests, CI checks, or runtime controls
-for results that require wider context. For teams that want to go one step
-further, the optional [`Claude Code gate`](examples/claude-code-gate/) extends
-the baseline with two deterministic checks before an edit is written. It also
-shows the limit of a simple blocking hook; work on executable constraints
-reports the same gap between passive instructions and enforceable checks
+[Chen et al., 2026](https://arxiv.org/abs/2604.20200)). Requirements that must
+hold need controls outside the model: permission boundaries to restrict
+actions, deterministic guards for machine-checkable violations, and tests, CI
+checks, or runtime controls for results that require wider context
 ([Sharma, 2026](https://arxiv.org/abs/2603.00822)).
 
 ## Covered risks
@@ -174,10 +166,11 @@ Each rule requires a concrete mechanism, not a general goal.
   apply the baseline to all code and interfaces being created. Establish every
   applicable control, secure configuration, and test as part of the design, and
   verify them before the first production release.
-- **New component in an existing application:** treat the new component and its
-  interfaces as greenfield while integrating them through the application's
-  established security mechanisms. If the scope is unclear, ask rather than
-  treating an existing application as greenfield.
+- **New component in an existing application** (`AISEC-OM-001`,
+  `AISEC-OM-002`): treat the new component and its interfaces as greenfield
+  while integrating them through the application's established security
+  mechanisms. If the scope is unclear, ask rather than treating an existing
+  application as greenfield.
 - **Mixed request** (`AISEC-OM-003`): deliver the legitimate part, refuse only
   the forbidden part, and offer a concrete safe alternative where possible.
 - **Explicit override** (`AISEC-OM-004`): prefer a compliant path; if the user
@@ -224,24 +217,23 @@ make install ARGS=--user               # user-level install
 make install ARGS="--into <path>"      # another project
 ```
 
-`install-codex` and `install-copilot` work like `install-claude`. Existing
-instruction files and organization-wide setup require the manual steps below.
+`install-codex` and `install-copilot` mirror `install-claude`. Use the manual
+steps below for existing instruction files and organization-wide setup.
 
 The guided flow installs or updates selected tools at user level by default, or
-in the current project when run inside one, and verifies each integration.
-Project setup supports Claude Code, Codex, and GitHub Copilot; user setup
-supports Claude Code, Codex, and Copilot CLI. Existing instruction files and
-unrelated symlinks remain untouched.
+in the current project, and verifies each integration. Projects support Claude
+Code, Codex, and GitHub Copilot; user installs support Claude Code, Codex, and
+Copilot CLI. Existing instruction files and unrelated symlinks are preserved.
 
-Setup can also add session-start hooks that display the active `baseline-id`
-and read the managed baseline on every start. Select all, some, or none; valid
-existing hook settings are merged and ambiguous ones are left untouched. Codex
-may require review through `/hooks` after a hook changes.
+Setup can add session-start hooks that show the active `baseline-id` and load
+the managed baseline. Choose any tools or skip hooks; valid settings are merged,
+while ambiguous ones remain unchanged. Codex may require review through
+`/hooks` afterward.
 
-The installer prefers the latest published release and falls back to the
-checkout copy. Use `ARGS=--offline` to skip that check. Locally edited managed
-baselines require confirmation before replacement and receive a backup.
-`make status` performs the same detection without changing anything.
+The installer uses the latest published release when available, otherwise the
+checkout copy. `ARGS=--offline` skips the release check. Replacing a locally
+edited managed baseline requires confirmation and creates a backup. The same
+detection runs read-only with `make status`.
 
 ### Claude Code
 
