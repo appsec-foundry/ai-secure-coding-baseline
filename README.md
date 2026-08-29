@@ -1,6 +1,5 @@
 # AI Secure Coding Baseline
 
-[![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)](#)
 [![Last commit](https://img.shields.io/github/last-commit/appsec-foundry/ai-secure-coding-baseline.svg)](https://github.com/appsec-foundry/ai-secure-coding-baseline/commits)
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-D97757?logo=anthropic&logoColor=white)](https://code.claude.com/)
@@ -11,18 +10,17 @@ A short set of secure-coding rules for AI coding assistants. Add it to a
 project's instructions so Claude Code, Copilot, Codex, and other agents can
 apply it when they write or change code.
 
-> The [appsec-advisor](https://github.com/appsec-foundry/appsec-advisor) Claude
-> Code plugin can install it with `/appsec-advisor:install-baseline`. For manual
-> setup, see [Using it](#using-it).
-
-> **Status: Beta.** The rules and wording may still change; no stable version is
-> tagged yet.
+> For Claude Code, use the
+> [appsec-advisor plugin](https://github.com/appsec-foundry/appsec-advisor).
 
 > **Limitations**
 >
-> This baseline guides an LLM. It does not enforce behavior or guarantee secure
-> code. Pair it with project-specific instructions, reviews, tests, dependency
-> and secret scanning, and appropriate CI checks.
+> This baseline is an instruction layer, not an enforcement boundary. Its effect
+> depends on its place in an assistant's instruction hierarchy, and it cannot
+> guarantee compliance or secure code. Pair it with project-specific
+> instructions, reviews, tests, dependency and secret scanning, CI checks, and,
+> where supported, deterministic gates such as the optional
+> [`Claude Code gate`](examples/claude-code-gate/).
 
 The baseline is 19.5 KB and roughly 3,900 tokens, within its approximate
 4,000-token budget. It has been refined through AI-assisted coding tasks, not
@@ -50,11 +48,9 @@ checkout and keeps existing instruction files. Other options are under
 ## Why this exists
 
 AI coding assistants know many security practices but do not apply them
-consistently, especially under pressure. This baseline makes the expected
-behavior explicit and tells assistants which shortcuts to avoid.
-Without shared rules, one change may use the project's security mechanisms
-while the next omits authorization or disables verification to make something
-work. The baseline keeps the same expectations present across tools and
+consistently, especially under pressure. Without shared rules, one change may
+preserve an existing control while the next bypasses it to make something work.
+This baseline keeps concrete security expectations present across tools and
 sessions without repeating them in every prompt.
 
 ## Background
