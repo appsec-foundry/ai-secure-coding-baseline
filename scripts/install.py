@@ -44,6 +44,7 @@ MAX_INSTRUCTION_BYTES = 512 * 1024
 MAX_API_BYTES = 512 * 1024
 MAX_REGISTRY_BYTES = 128 * 1024
 MAX_PROJECTS = 200
+MAX_COLUMN = 40
 REGISTRY_SCHEMA = 1
 
 SEMVER_TEXT = (
@@ -299,25 +300,21 @@ def fetch_release_baseline(
 
 
 def latest_available(check_online: bool) -> tuple[Baseline, str]:
+    """Return the baseline to install and a short note for the origin line."""
     bundled = bundled_baseline()
     if not check_online:
-        return bundled, "Online check skipped; using the bundled baseline."
+        return bundled, ", online check skipped"
     try:
         released = fetch_release_baseline()
     except urllib.error.HTTPError as error:
         if error.code == 404:
-            return bundled, "No published release found; using the bundled baseline."
-        return bundled, "Online check unavailable; using the bundled baseline."
+            return bundled, ", no published release"
+        return bundled, ", online check unavailable"
     except (OSError, ValueError, json.JSONDecodeError):
-        return bundled, "Online check unavailable; using the bundled baseline."
+        return bundled, ", online check unavailable"
     if bundled.version > released.version:
-        return bundled, (
-            f"Bundled {bundled.version} is newer than published {released.version}; "
-            "using the bundled baseline."
-        )
-    if released.version > bundled.version:
-        return released, f"Published baseline {released.version} is available."
-    return released, f"Published baseline {released.version} is current."
+        return bundled, f", newer than published {released.version}"
+    return released, ""
 
 
 def project_targets(root: Path) -> dict[str, list[tuple[str, Path]]]:
@@ -981,27 +978,25 @@ def _path_from_answer(answer: str, home: Path) -> Path:
 
 def _installation_state(installation: Installation, available: Baseline) -> str:
     if not installation.baseline.is_official:
-        return "customized; automatic update disabled"
+        return "customized, no auto-update"
     if installation.kind == "unmanaged":
-        return "manual file; automatic update disabled"
+        return "manual file, no auto-update"
     if installation.has_update(available):
         if installation.baseline.version < available.version:
-            state = f"update to {available.baseline_id} available"
+            state = f"update → {available.baseline_id}"
         else:
-            state = f"content differs from available {available.baseline_id}"
+            state = f"differs from {available.baseline_id}"
         if (
             installation.kind in {"project", "user"}
             and installation.tracked_digest != installation.baseline.digest
         ):
-            state += "; replacement needs separate confirmation and a backup"
+            state += ", needs confirmation and backup"
         return state
     if installation.baseline.version > available.version:
-        return "newer than the available baseline"
+        return "newer than available"
     if installation.kind == "legacy-user":
-        return "version matches; migration to managed storage recommended"
-    if available.origin.startswith("GitHub release "):
-        return "current published version"
-    return "matches the bundled baseline"
+        return "current, migration recommended"
+    return "current"
 
 
 def _installation_symbol(installation: Installation, available: Baseline) -> str:
@@ -1015,31 +1010,43 @@ def _installation_symbol(installation: Installation, available: Baseline) -> str
     return "•"
 
 
-def _installation_line(
+def _installation_scope(installation: Installation, current_root: Path | None) -> str:
+    if installation.kind in {"user", "legacy-user"}:
+        return "user"
+    if installation.kind == "unmanaged":
+        return display_path(installation.source)
+    root = installation.root.resolve(strict=False)
+    if current_root and root == current_root.resolve(strict=False):
+        return "project"
+    return display_path(installation.root)
+
+
+def _installation_row(
     installation: Installation,
     available: Baseline,
-    *,
-    include_label: bool,
-) -> str:
-    tools = (
-        ", ".join(TOOL_LABELS[tool] for tool in installation.tools)
-        or "no tool integrations"
-    )
-    if include_label:
-        label = installation.label
-    elif installation.kind == "unmanaged":
-        label = f"manual file {display_path(installation.source)}"
-    elif installation.kind == "project":
-        label = "project baseline"
-    elif installation.kind == "legacy-user":
-        label = f"checkout-linked baseline {display_path(installation.source)}"
-    else:
-        label = "managed user baseline"
+    current_root: Path | None,
+) -> tuple[str, ...]:
     return (
-        f"  {_installation_symbol(installation, available)} {label}: "
-        f"{installation.baseline.baseline_id} — "
-        f"{_installation_state(installation, available)} ({tools})"
+        _installation_symbol(installation, available),
+        _installation_scope(installation, current_root),
+        installation.baseline.baseline_id,
+        _installation_state(installation, available),
+        ", ".join(TOOL_LABELS[tool] for tool in installation.tools) or "no tools",
     )
+
+
+def _show_rows(output: Callable[[str], None], rows: list[tuple[str, ...]]) -> None:
+    """Print one aligned line per installation; the last column is not padded.
+
+    A single long path is capped so it does not indent every other row.
+    """
+    widths = [
+        min(max(len(row[column]) for row in rows), MAX_COLUMN)
+        for column in range(len(rows[0]) - 1)
+    ]
+    for row in rows:
+        padded = [cell.ljust(width) for cell, width in zip(row, widths)]
+        output(("  " + "  ".join([*padded, row[-1]])).rstrip())
 
 
 def _show_installations(
@@ -1047,13 +1054,16 @@ def _show_installations(
     installations: list[Installation],
     available: Baseline,
     heading: str,
+    current_root: Path | None = None,
 ) -> None:
     output(heading)
     if not installations:
-        output("  - no baseline found")
+        output("  - none found")
         return
-    for installation in installations:
-        output(_installation_line(installation, available, include_label=True))
+    _show_rows(
+        output,
+        [_installation_row(item, available, current_root) for item in installations],
+    )
 
 
 def _show_setup_status(
@@ -1079,24 +1089,17 @@ def _show_setup_status(
         else:
             other.append(installation)
 
-    output("\nInstallation status")
-    output("  ✓ current   ↻ update available   • other detected installation")
-    output(f"\nCurrent project {display_path(current_root)}:")
+    rows: list[tuple[str, ...]] = []
     if not any(item.kind == "project" for item in current):
-        output("  - no managed project installation")
-    for installation in current:
-        output(_installation_line(installation, available, include_label=False))
-
-    output("\nUser-wide:")
+        rows.append(("-", "project", "", "not installed", ""))
+    rows += [_installation_row(item, available, current_root) for item in current]
     if not any(item.kind in {"user", "legacy-user"} for item in user):
-        output("  - no managed user installation")
-    for installation in user:
-        output(_installation_line(installation, available, include_label=False))
+        rows.append(("-", "user", "", "not installed", ""))
+    rows += [_installation_row(item, available, current_root) for item in user]
+    rows += [_installation_row(item, available, current_root) for item in other]
 
-    if other:
-        output("\nOther known projects:")
-        for installation in other:
-            output(_installation_line(installation, available, include_label=True))
+    output("\nInstalled")
+    _show_rows(output, rows)
 
 
 def _record_current_scope(
@@ -1133,22 +1136,21 @@ def _review_updates(
     if not outdated:
         return False
 
-    output("\nUpdates available")
     changed = False
     for installation in outdated:
         reviewed.add(_update_key(installation))
         if installation.baseline.version < available.version:
             question = (
-                f"Update {installation.label} from "
-                f"{installation.baseline.baseline_id} to {available.baseline_id}?"
+                f"\nUpdate {installation.label} "
+                f"{installation.baseline.baseline_id} → {available.baseline_id}?"
             )
         else:
             question = (
-                f"Replace the differing {installation.baseline.baseline_id} content "
+                f"\nReplace the differing {installation.baseline.baseline_id} content "
                 f"in {installation.label} with the available copy?"
             )
         if not ask_yes_no(input_fn, question, True):
-            output(f"kept {installation.label} unchanged")
+            output(f"  kept {installation.label} unchanged")
             continue
         report, updated = update_installation(
             installation,
@@ -1156,7 +1158,7 @@ def _review_updates(
             lambda prompt, default: ask_yes_no(input_fn, prompt, default),
         )
         for line in report:
-            output(line)
+            output(f"  {line}")
         if updated:
             record_installation(registry, updated, trusted=True)
             changed = True
@@ -1197,6 +1199,7 @@ def _install_project_interactively(
         found,
         available,
         f"\nSelected project {display_path(root)}:",
+        root,
     )
     changed = _review_updates(
         found,
@@ -1311,8 +1314,8 @@ def interactive_setup(
         raise ValueError("current project must be an existing non-root directory")
 
     output("AI Secure Coding Baseline setup")
-    output(f"Available: {available.baseline_id} ({available.origin})")
-    output(online_note)
+    output(f"Available  {available.baseline_id}  ({available.origin}{online_note})")
+    output(f"Project    {display_path(current_root)}")
     if registry_note:
         output(registry_note)
     installations = discover_installations(home, registry, current_root)
@@ -1336,13 +1339,12 @@ def interactive_setup(
         for item in installations
     )
     user_installed = any(item.kind in {"user", "legacy-user"} for item in installations)
-    current_action = "Check or add tools in" if current_installed else "Install in"
-    user_action = "Check or add tools for" if user_installed else "Install for"
-    output("\nNext action")
-    output(f"  1. {current_action} current project {display_path(current_root)}")
-    output("  2. Install or check another project")
-    output(f"  3. {user_action} this user")
-    output("  4. Exit")
+    current_action = "tools in project" if current_installed else "install in project"
+    user_action = "tools for user" if user_installed else "install for user"
+    output(
+        f"\nNext  [1] {current_action}  [2] another project  "
+        f"[3] {user_action}  [4] exit"
+    )
     choice = ""
     for _ in range(3):
         choice = _read_answer(input_fn, "Choice [4]: ") or "4"
@@ -1396,8 +1398,8 @@ def installation_status(
         raise ValueError("current project must be an existing non-root directory")
 
     output("AI Secure Coding Baseline status")
-    output(f"Available: {available.baseline_id} ({available.origin})")
-    output(online_note)
+    output(f"Available  {available.baseline_id}  ({available.origin}{online_note})")
+    output(f"Project    {display_path(current_root)}")
     if registry_note:
         output(registry_note)
     installations = discover_installations(home, registry, current_root)

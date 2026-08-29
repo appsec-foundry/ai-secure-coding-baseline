@@ -173,9 +173,9 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check("status check marks current and outdated installations",
           status_result == 0
-          and any(line.startswith("  ✓ project baseline:")
+          and any(line.startswith("  ✓") and " project " in line
                   for line in status_output)
-          and any(line.startswith("  ↻ managed user baseline:")
+          and any(line.startswith("  ↻") and " user " in line
                   for line in status_output),
           str(status_output))
     check("status check is read-only", not state.exists(), str(state))
@@ -346,7 +346,7 @@ with tempfile.TemporaryDirectory() as tmp:
           str(output))
     check("an update does not hide the next-action menu",
           any("Update project" in prompt for prompt in prompts)
-          and "\nNext action" in output,
+          and any(line.startswith("\nNext  [1]") for line in output),
           f"prompts={prompts!r}, output={output!r}")
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -382,13 +382,14 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check("user-only setup clearly offers the current project",
           result == 0
-          and "  - no managed project installation" in output
-          and any("Install in current project" in line for line in output),
+          and any(line.startswith("  -") and "project" in line
+                  and "not installed" in line for line in output)
+          and any("[1] install in project" in line for line in output),
           str(output))
     check("a user update can be followed by a project install",
           install.read_baseline(install.user_source(home)).digest == bundled.digest
           and (project / "AGENTS.md").is_symlink()
-          and any("Update user-wide from" in prompt for prompt in prompts),
+          and any("Update user-wide" in prompt for prompt in prompts),
           f"prompts={prompts!r}, output={output!r}")
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -429,7 +430,9 @@ with tempfile.TemporaryDirectory() as tmp:
         state_path=state,
         current_root=current,
     )
-    update_prompts = [prompt for prompt in prompts if prompt.startswith("Update ")]
+    update_prompts = [
+        prompt for prompt in prompts if prompt.lstrip().startswith("Update ")
+    ]
     check("different scopes receive separate update decisions",
           len(update_prompts) == 2
           and any("user-wide" in prompt for prompt in update_prompts)
