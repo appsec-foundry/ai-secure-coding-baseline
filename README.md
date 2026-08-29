@@ -28,8 +28,9 @@ formally certified.
 
 ## Quick start
 
-The command below downloads a fixed version of the setup script and verifies
-its SHA-256 before running it:
+The guided installer is the recommended way to install or update the baseline.
+To run it without a repository checkout, the command below downloads a fixed
+version of the setup script and verifies its SHA-256 before running it:
 
 ```bash
 curl --proto '=https' \
@@ -41,8 +42,8 @@ echo '0a47d6ebaef4b86867d1e75867213689863daf7e72da1ba2b97ddd54f7046441  aisec-se
 bash aisec-setup.sh
 ```
 
-The guided setup installs or updates the selected environments without a
-checkout and keeps existing instruction files. Other options are under
+It lets you select the target environments, verifies each integration, and
+keeps existing instruction files. Checkout-based and manual options are under
 [Using it](#using-it).
 
 ## Why this exists
@@ -190,18 +191,17 @@ acceptance criteria, and test coverage.
 
 ## Using it
 
-Each tool reads instructions from different locations. Keep
-`secure-coding-baseline.md` as the single source. Import or symlink it where
-possible, and copy it only when necessary. The sections below cover Claude Code,
-GitHub Copilot, and agents that use [`AGENTS.md`](https://agents.md/) at project,
-user, and organization level.
+The guided installer covers normal project- and user-level installation and
+updates. The manual instructions below are useful for existing instruction
+files, custom layouts, and organization-wide setup. Keep
+`secure-coding-baseline.md` as the single source: import or symlink it where
+possible, and copy it only when necessary.
 
 ### Remote setup (no checkout)
 
-The quick-start command downloads a fixed version of the setup script, verifies
-its SHA-256, and runs it only when the check succeeds. It requires Bash,
-`curl`, `sha256sum`, and Python 3. The downloaded `aisec-setup.sh` remains
-available for inspection or deletion.
+Use the pinned and verified command in the [Quick start](#quick-start). It
+requires Bash, `curl`, `sha256sum`, and Python 3. The downloaded
+`aisec-setup.sh` remains available for inspection or deletion.
 
 ### From a repository clone
 
