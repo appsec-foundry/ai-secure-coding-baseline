@@ -372,6 +372,10 @@ files with `/context` or `/memory`.
 
 ## Adapting it
 
+The license allows an organization to run its own baseline derived from this
+one, carrying its own security requirements, approved tech stacks, and internal
+policies, as long as the attribution stays.
+
 Add stack-specific details such as approved libraries, framework patterns, or
 review steps. Keep existing rule-group IDs, but change the baseline ID, for
 example to `aisec-0.1.10+acme`, so `baseline?` identifies the derived version.
@@ -395,6 +399,18 @@ make dry-run                                       # preview the model-run matri
 python3 tests/run.py --cases greenfield-order-app  # run one case in both arms
 make test                                          # all cases with Claude
 make test-all                                      # all cases with Claude and Codex
+```
+
+### Local testing
+
+`--safe-mode` ignores user- and project-level instruction files, so an
+uncommitted candidate is the only baseline in the session; it also disables
+skills, plugins, hooks, and MCP servers.
+
+```bash
+BASELINE=<path-to-clone>/secure-coding-baseline.md
+claude --safe-mode --append-system-prompt "$(cat "$BASELINE")"                 # session
+claude --safe-mode --append-system-prompt "$(cat "$BASELINE")" -p "baseline?"  # what loaded
 ```
 
 ## An example gate
