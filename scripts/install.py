@@ -447,7 +447,13 @@ def _instruction_lines(target: Path) -> list[str]:
     return content.decode("utf-8").splitlines()
 
 
-def install_import_line(target: Path, source: Path, report: list[str]) -> None:
+def install_import_line(
+    target: Path,
+    source: Path,
+    report: list[str],
+    *,
+    accepted_sources: tuple[Path, ...] = (),
+) -> None:
     line = f"@{source}"
     if target.exists():
         try:
@@ -455,7 +461,8 @@ def install_import_line(target: Path, source: Path, report: list[str]) -> None:
         except (OSError, UnicodeDecodeError, ValueError):
             report.append(f"blocked {target}: cannot safely read existing file")
             return
-        if line in lines:
+        accepted_lines = {line, *(f"@{item}" for item in accepted_sources)}
+        if any(item in lines for item in accepted_lines):
             report.append(f"in place {target}")
         else:
             report.append(f"blocked {target}: exists — add the line {line!r} by hand")
@@ -498,7 +505,16 @@ def install(
             if kind == "link":
                 install_link(target, source, report, relative=relative)
             else:
-                install_import_line(target, source, report)
+                accepted_sources = (
+                    (targets[tool][0][1],) if home is not None and tool == "claude"
+                    else ()
+                )
+                install_import_line(
+                    target,
+                    source,
+                    report,
+                    accepted_sources=accepted_sources,
+                )
     return report
 
 
@@ -716,6 +732,53 @@ def install_version_hooks(
     return report
 
 
+def _version_hook_is_installed(tool: str, root: Path, home: Path | None) -> bool:
+    helper = version_hook_path(root, home)
+    if helper.is_symlink() or not helper.is_file():
+        return False
+    try:
+        if read_limited(helper, MAX_BASELINE_BYTES) != read_limited(
+            VERSION_HOOK_SOURCE, MAX_BASELINE_BYTES
+        ):
+            return False
+    except (OSError, ValueError):
+        return False
+
+    project = home is None
+    try:
+        if tool == "claude":
+            path = (root / ".claude" / "settings.json") if project else (
+                home / ".claude" / "settings.json"
+            )
+            config, _existed = _read_hook_config(path)
+            hooks = config.get("hooks")
+            entries = hooks.get("SessionStart") if isinstance(hooks, dict) else None
+            return isinstance(entries, list) and _claude_version_hook(
+                helper, project
+            ) in entries
+        if tool == "codex":
+            path = (root / ".codex" / "hooks.json") if project else (
+                home / ".codex" / "hooks.json"
+            )
+            config, _existed = _read_hook_config(path)
+            hooks = config.get("hooks")
+            entries = hooks.get("SessionStart") if isinstance(hooks, dict) else None
+            return isinstance(entries, list) and _codex_version_hook(
+                helper, project
+            ) in entries
+        if tool == "copilot":
+            path = (
+                root / ".github" / "hooks" / COPILOT_VERSION_HOOK_NAME
+                if project
+                else home / ".copilot" / "hooks" / COPILOT_VERSION_HOOK_NAME
+            )
+            config, _existed = _read_hook_config(path)
+            return config == _copilot_version_config(helper, project)
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+        return False
+    return False
+
+
 def registry_path(home: Path) -> Path:
     return home / ".config" / "ai-secure-coding-baseline" / "installations.json"
 
@@ -844,7 +907,9 @@ def scan_user(home: Path, user_entry: object = None) -> list[Installation]:
     claude_link = targets["claude"][0][1]
     if claude_link.is_symlink():
         source = claude_link.resolve(strict=False)
-        if _import_contains(targets["claude"][1][1], source):
+        if _import_contains(
+            targets["claude"][1][1], source
+        ) or _import_contains(targets["claude"][1][1], claude_link):
             sources.setdefault(source, set()).add("claude")
 
     for tool in ("codex", "copilot"):
@@ -1044,6 +1109,7 @@ def migrate_legacy_user(
         report.append(f"added {destination}")
 
     targets = user_targets(home)
+    claude_link = targets["claude"][0][1]
     migrated: list[str] = []
     for tool in installation.tools:
         complete = True
@@ -1057,6 +1123,7 @@ def migrate_legacy_user(
                 complete = complete and not target.is_symlink() and (
                     _import_contains(target, destination)
                     or _import_contains(target, installation.source)
+                    or (tool == "claude" and _import_contains(target, claude_link))
                 )
         if not complete:
             report.append(f"blocked {TOOL_LABELS[tool]}: changed since discovery")
@@ -1067,6 +1134,8 @@ def migrate_legacy_user(
                     continue
                 _atomic_symlink(target, destination)
                 report.append(f"linked {target} -> {destination}")
+            elif tool == "claude" and _import_contains(target, claude_link):
+                continue
             elif not _replace_import(target, installation.source, destination):
                 report.append(f"blocked {target}: import changed since discovery")
                 complete = False
@@ -1169,17 +1238,21 @@ def choose_tools(
         if default_tools is not None
         else list(tools)
     )
+    has_installed_tools = default_tools is not None and bool(defaults)
     if not defaults:
         defaults = list(tools)
-    if defaults == list(tools):
-        default_label = "all"
-    else:
-        default_label = "currently installed: " + ", ".join(
+    if has_installed_tools:
+        default_label = "keep installed (" + ", ".join(
             TOOL_LABELS[tool] for tool in defaults
-        )
+        ) + ")"
+    else:
+        default_label = "all"
     output("\nChoose one or more tools:")
     for number, tool in enumerate(tools, 1):
-        output(f"  {number}. {TOOL_LABELS[tool]}")
+        installed = (
+            " (installed)" if has_installed_tools and tool in defaults else ""
+        )
+        output(f"  {number}. {TOOL_LABELS[tool]}{installed}")
     for _ in range(3):
         answer = _read_answer(
             input_fn,
@@ -1251,6 +1324,18 @@ def _path_from_answer(answer: str, home: Path) -> Path:
     else:
         candidate = Path(answer)
     return candidate.resolve()
+
+
+def _detect_project_root(location: Path) -> Path | None:
+    for candidate in (location, *location.parents):
+        git_marker = candidate / ".git"
+        if git_marker.is_file() or (
+            git_marker.is_dir() and (git_marker / "HEAD").is_file()
+        ):
+            return candidate
+        if candidate == location and scan_project(candidate, {}) is not None:
+            return candidate
+    return None
 
 
 def _installation_state(installation: Installation, available: Baseline) -> str:
@@ -1348,9 +1433,11 @@ def _show_setup_status(
     installations: list[Installation],
     available: Baseline,
     home: Path,
-    current_root: Path,
+    current_root: Path | None,
 ) -> None:
-    current_resolved = current_root.resolve(strict=False)
+    current_resolved = (
+        current_root.resolve(strict=False) if current_root is not None else None
+    )
     home_resolved = home.resolve(strict=False)
     current: list[Installation] = []
     user: list[Installation] = []
@@ -1361,13 +1448,15 @@ def _show_setup_status(
             user.append(installation)
         elif installation.kind == "unmanaged" and root == home_resolved:
             user.append(installation)
-        elif root == current_resolved:
+        elif current_resolved is not None and root == current_resolved:
             current.append(installation)
         else:
             other.append(installation)
 
     rows: list[tuple[str, ...]] = []
-    if not any(item.kind == "project" for item in current):
+    if current_root is not None and not any(
+        item.kind == "project" for item in current
+    ):
         rows.append(("-", "project", "", "not installed", ""))
     rows += [_installation_row(item, available, current_root) for item in current]
     if not any(item.kind in {"user", "legacy-user"} for item in user):
@@ -1405,7 +1494,6 @@ def _review_updates(
     reviewed: set[Path],
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
-    updated_installations: list[Installation] | None = None,
 ) -> bool:
     outdated = [
         item
@@ -1440,8 +1528,6 @@ def _review_updates(
             output(f"  {line}")
         if updated:
             record_installation(registry, updated, trusted=True)
-            if updated_installations is not None:
-                updated_installations.append(updated)
             changed = True
     return changed
 
@@ -1453,17 +1539,43 @@ def _offer_version_hooks(
     home: Path | None,
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
-) -> None:
+) -> bool:
     if installed is None:
-        return
+        return False
     tools = [tool for tool in selected_tools if tool in installed.tools]
     if not tools:
-        return
+        return False
     hook_tools = choose_hook_tools(input_fn, output, tools)
     if not hook_tools:
-        return
+        return False
     for line in install_version_hooks(hook_tools, root, home):
-        output(line)
+        output(f"  {line}")
+    output("\nVerifying startup hooks:")
+    incomplete = False
+    for tool in hook_tools:
+        if _version_hook_is_installed(tool, root, home):
+            output(f"  ✓ {TOOL_LABELS[tool]} hook configured")
+        else:
+            output(f"  ! {TOOL_LABELS[tool]} hook incomplete")
+            incomplete = True
+    return incomplete
+
+
+def _verify_baseline_tools(
+    selected_tools: list[str],
+    installed: Installation | None,
+    output: Callable[[str], None],
+) -> bool:
+    configured = set(installed.tools) if installed is not None else set()
+    output("\nVerifying baseline setup:")
+    incomplete = False
+    for tool in selected_tools:
+        if tool in configured:
+            output(f"  ✓ {TOOL_LABELS[tool]} configured")
+        else:
+            output(f"  ! {TOOL_LABELS[tool]} incomplete")
+            incomplete = True
+    return incomplete
 
 
 def _install_project_interactively(
@@ -1474,21 +1586,21 @@ def _install_project_interactively(
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
     root: Path | None = None,
-) -> bool:
+) -> tuple[bool, bool]:
     if root is None:
         answer = _read_answer(input_fn, "Project directory (blank to cancel): ")
         if not answer:
-            return False
+            return False, False
         try:
             root = _path_from_answer(answer, home)
         except (OSError, RuntimeError):
             output("Invalid project path.")
-            return False
+            return False, False
     else:
         root = root.resolve()
     if root == Path(root.anchor) or not root.is_dir():
         output("Project directory must be an existing non-root directory.")
-        return False
+        return False, False
 
     projects = registry.get("projects", {})
     entry = projects.get(str(root)) if isinstance(projects, dict) else None
@@ -1515,16 +1627,20 @@ def _install_project_interactively(
     tools = choose_tools(input_fn, output, TOOLS, default_tools)
     if not tools:
         output("Setup cancelled.")
-        return changed
+        return changed, False
     output("\nApplying project setup:")
-    for line in install(tools, root, None, content=available.content):
+    report = install(tools, root, None, content=available.content)
+    for line in report:
         output(f"  {line}")
     projects = registry.get("projects", {})
     entry = projects.get(str(root)) if isinstance(projects, dict) else None
     installed = scan_project(root, entry if isinstance(entry, dict) else {})
     _record_current_scope(registry, installed, available)
-    _offer_version_hooks(tools, installed, root, None, input_fn, output)
-    return changed or installed is not None
+    incomplete = _verify_baseline_tools(tools, installed, output)
+    hook_incomplete = _offer_version_hooks(
+        tools, installed, root, None, input_fn, output
+    )
+    return changed or installed is not None, incomplete or hook_incomplete
 
 
 def _install_user_interactively(
@@ -1534,7 +1650,7 @@ def _install_user_interactively(
     reviewed_updates: set[Path],
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
-) -> bool:
+) -> tuple[bool, bool]:
     user_entry = registry.get("user")
     existing = scan_user(home, user_entry if isinstance(user_entry, dict) else {})
     _show_installations(output, existing, available, "\nSelected user-wide scope:")
@@ -1575,9 +1691,10 @@ def _install_user_interactively(
     tools = choose_tools(input_fn, output, TOOLS, default_tools or None)
     if not tools:
         output("Setup cancelled.")
-        return changed
+        return changed, False
     output("\nApplying user-wide setup:")
-    for line in install(tools, Path.cwd(), home, content=available.content):
+    report = install(tools, Path.cwd(), home, content=available.content)
+    for line in report:
         output(f"  {line}")
     user_entry = registry.get("user")
     managed = [
@@ -1589,9 +1706,13 @@ def _install_user_interactively(
     ]
     if managed:
         _record_current_scope(registry, managed[0], available)
-        _offer_version_hooks(tools, managed[0], Path.cwd(), home, input_fn, output)
-        return True
-    return changed
+        incomplete = _verify_baseline_tools(tools, managed[0], output)
+        hook_incomplete = _offer_version_hooks(
+            tools, managed[0], Path.cwd(), home, input_fn, output
+        )
+        return True, incomplete or hook_incomplete
+    _verify_baseline_tools(tools, None, output)
+    return changed, True
 
 
 def _save_setup_registry(
@@ -1622,19 +1743,39 @@ def interactive_setup(
     available, online_note = latest_available(check_online)
     state_path = state_path or registry_path(home)
     registry, registry_writable, registry_note = load_registry(state_path)
-    current_root = (current_root or Path.cwd()).resolve()
-    if current_root == Path(current_root.anchor) or not current_root.is_dir():
-        raise ValueError("current project must be an existing non-root directory")
+    explicit_project = current_root is not None
+    location = (current_root or Path.cwd()).resolve()
+    if not location.is_dir():
+        raise ValueError("current location must be an existing directory")
+    project_root = location if explicit_project else _detect_project_root(location)
+    if project_root is not None and project_root == Path(project_root.anchor):
+        project_root = None
 
     output(f"Available  {available.baseline_id}  ({available.origin}{online_note})")
-    output(f"Project    {display_path(current_root)}")
+    if project_root is None:
+        output("Project    none detected")
+    else:
+        output(f"Project    {display_path(project_root)}")
     if registry_note:
         output(registry_note)
-    installations = discover_installations(home, registry, current_root)
-    _show_setup_status(output, installations, available, home, current_root)
+    discovered = discover_installations(home, registry, project_root)
+    home_resolved = home.resolve(strict=False)
+    project_resolved = (
+        project_root.resolve(strict=False) if project_root is not None else None
+    )
+    installations = [
+        item
+        for item in discovered
+        if item.kind in {"user", "legacy-user"}
+        or item.root.resolve(strict=False) == home_resolved
+        or (
+            project_resolved is not None
+            and item.root.resolve(strict=False) == project_resolved
+        )
+    ]
+    _show_setup_status(output, installations, available, home, project_root)
 
     reviewed_updates: set[Path] = set()
-    updated_installations: list[Installation] = []
     changed = _review_updates(
         installations,
         available,
@@ -1642,72 +1783,63 @@ def interactive_setup(
         reviewed_updates,
         input_fn,
         output,
-        updated_installations,
     )
     if changed:
         _save_setup_registry(state_path, registry, registry_writable, output)
 
-    current_installed = any(
+    current_installed = project_root is not None and any(
         item.kind == "project"
-        and item.root.resolve(strict=False) == current_root.resolve(strict=False)
+        and item.root.resolve(strict=False) == project_root.resolve(strict=False)
         for item in installations
     )
     user_installed = any(item.kind in {"user", "legacy-user"} for item in installations)
     current_action = "tools in project" if current_installed else "install in project"
     user_action = "tools for user" if user_installed else "install for user"
-    default_choice = ""
-    for installation in reversed(updated_installations):
-        if installation.kind in {"user", "legacy-user"}:
-            default_choice = "3"
-            break
-        if (
-            installation.kind == "project"
-            and installation.root.resolve(strict=False)
-            == current_root.resolve(strict=False)
-        ):
-            default_choice = "1"
-            break
-    if not default_choice:
-        default_choice = "1" if current_installed else "3" if user_installed else "4"
     output("\nWhat would you like to do?")
-    output(f"  1. {current_action}")
-    output("  2. choose another project")
-    output(f"  3. {user_action}")
-    output("  4. exit")
+    output(f"  1. {user_action}")
+    if project_root is not None:
+        output(f"  2. {current_action} {display_path(project_root)}")
+        output("  3. exit")
+        valid_choices = {"1", "2", "3"}
+        exit_choice = "3"
+    else:
+        output("  2. exit")
+        valid_choices = {"1", "2"}
+        exit_choice = "2"
     choice = ""
     for _ in range(3):
-        choice = _read_answer(input_fn, f"Choice [{default_choice}]: ") or default_choice
-        if choice in {"1", "2", "3", "4"}:
+        choice = _read_answer(input_fn, "Choice [1]: ") or "1"
+        if choice in valid_choices:
             break
-        output("Invalid selection. Choose 1, 2, 3, or 4.")
+        output(f"Invalid selection. Choose {', '.join(sorted(valid_choices))}.")
     else:
         output("Invalid selection; no additional changes made.")
         return 2
 
     action_changed = False
+    action_incomplete = False
     if choice == "1":
-        action_changed = _install_project_interactively(
+        action_changed, action_incomplete = _install_user_interactively(
+            home, registry, available, reviewed_updates, input_fn, output
+        )
+    elif choice == "2" and project_root is not None:
+        action_changed, action_incomplete = _install_project_interactively(
             home,
             registry,
             available,
             reviewed_updates,
             input_fn,
             output,
-            current_root,
-        )
-    elif choice == "2":
-        action_changed = _install_project_interactively(
-            home, registry, available, reviewed_updates, input_fn, output
-        )
-    elif choice == "3":
-        action_changed = _install_user_interactively(
-            home, registry, available, reviewed_updates, input_fn, output
+            project_root,
         )
 
     if action_changed:
         _save_setup_registry(state_path, registry, registry_writable, output)
-    if choice == "4":
+    if choice == exit_choice:
         output("Setup complete." if changed else "No changes made.")
+    elif action_incomplete:
+        output("\nSetup finished with unresolved items.")
+        return 2
     elif action_changed:
         output("\nSetup complete.")
     else:

@@ -226,15 +226,17 @@ make install ARGS="--into <path>"      # another project
 instruction files and organization-wide setup require the manual steps below.
 
 For normal setup and updates, run `make setup`; `make update` starts the same
-guided flow with the more discoverable update name. It shows the current
-project, the supported user-level locations, and projects managed by earlier
-runs.
-Choose a scope, then select tools by number or name. For a new installation,
-Enter selects all tools. For an existing installation, Enter keeps its current
-tool selection; enter `all` to add every tool. Project installs support Claude
-Code, Codex, and GitHub Copilot. User-wide installs support Claude Code, Codex,
-and Copilot CLI; Copilot account instructions for other surfaces must still be
-configured in the corresponding GitHub or IDE settings.
+guided flow with the more discoverable update name. It shows the supported
+user-level locations and, when detected, the current project.
+User-wide setup is the default. A project option appears only when setup is run
+inside a detected project, and the menu shows that project's root path. Run
+setup from another project to configure it. Existing tools are marked in the
+list. For a new installation, Enter selects all tools. For an existing
+installation, Enter keeps the marked selection; enter `all` to add every tool.
+Project installs support Claude Code, Codex, and GitHub Copilot. User-wide
+installs support Claude Code, Codex, and Copilot CLI; Copilot account
+instructions for other surfaces must still be configured in the corresponding
+GitHub or IDE settings.
 
 After installing the selected tools, the guided setup offers a session-start
 hook for those tools. Only tools selected for that scope are listed. Enter
@@ -247,6 +249,10 @@ native system message, while Copilot CLI prints a startup banner. Project-level
 Copilot hooks also run in the cloud agent, but that non-interactive environment
 has no user-facing startup display. Codex requires review and trust for a new or
 changed hook; use `/hooks` when Codex reports that review is pending.
+
+After each action, setup verifies the baseline integration and any selected
+hooks for every chosen tool. An incomplete tool is reported as unresolved and
+does not receive a startup hook.
 
 The installer uses the latest published release when available and otherwise
 uses the copy in the checkout. Pass `ARGS=--offline` to skip the release check.

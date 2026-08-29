@@ -151,16 +151,22 @@ check("guided tool selection clearly supports multiple tools",
 all_tools = install.choose_tools(lambda _prompt: "", lambda _line: None, install.TOOLS)
 check("guided setup defaults to all three tools", all_tools == list(install.TOOLS))
 existing_tool_prompts: list[str] = []
+existing_tool_output: list[str] = []
 existing_tools = install.choose_tools(
     lambda prompt: existing_tool_prompts.append(prompt) or "",
-    lambda _line: None,
+    existing_tool_output.append,
     install.TOOLS,
     ["codex"],
 )
 check("existing scopes default to their installed tools",
       existing_tools == ["codex"]
-      and any("currently installed: Codex" in prompt
-              for prompt in existing_tool_prompts), str(existing_tool_prompts))
+      and "  2. Codex (installed)" in existing_tool_output
+      and not any("Claude Code (installed)" in line
+                  or "GitHub Copilot (installed)" in line
+                  for line in existing_tool_output)
+      and any("Enter = keep installed (Codex)" in prompt
+              for prompt in existing_tool_prompts),
+      f"prompts={existing_tool_prompts!r}, output={existing_tool_output!r}")
 hook_output: list[str] = []
 hook_prompts: list[str] = []
 hook_tools = install.choose_hook_tools(
@@ -381,13 +387,46 @@ with tempfile.TemporaryDirectory() as tmp:
           old_source.read_bytes() == bundled.content)
 
 with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    old_checkout = home / "old-checkout"
+    old_checkout.mkdir()
+    old_source = old_checkout / install.BASELINE
+    old_source.write_bytes(bundled.content)
+    claude_link = home / ".claude" / install.BASELINE
+    claude_link.parent.mkdir()
+    claude_link.symlink_to(old_source)
+    claude_instructions = home / ".claude" / "CLAUDE.md"
+    claude_instructions.write_text(f"@{claude_link}\n", encoding="utf-8")
+    matches = [
+        item for item in install.scan_user(home) if item.kind == "legacy-user"
+    ]
+    report, migrated = install.migrate_legacy_user(matches[0], bundled)
+    install_report = install.install(["claude"], home, home)
+    hook_report = install.install_version_hooks(["claude"], home, home)
+    managed = [item for item in install.scan_user(home) if item.kind == "user"]
+    check("Claude legacy links migrate to managed user storage",
+          migrated is not None
+          and migrated.tools == ("claude",)
+          and claude_link.resolve() == install.user_source(home).resolve()
+          and claude_instructions.read_text(encoding="utf-8")
+              == f"@{claude_link}\n"
+          and managed and managed[0].tools == ("claude",),
+          f"migration={report!r}, install={install_report!r}, hook={hook_report!r}")
+    check("Claude's stable import link is accepted after migration",
+          not any(line.startswith("blocked") for line in install_report),
+          str(install_report))
+    check("Claude's startup hook works after legacy migration",
+          install._version_hook_is_installed("claude", home, home),
+          str(hook_report))
+
+with tempfile.TemporaryDirectory() as tmp:
     sandbox = Path(tmp)
     home = sandbox / "home"
     project = sandbox / "project"
     home.mkdir()
     project.mkdir()
     state = home / "state.json"
-    answers = iter(["3", "", ""])
+    answers = iter(["1", "", ""])
     output: list[str] = []
     result = install.interactive_setup(
         home=home,
@@ -417,10 +456,73 @@ with tempfile.TemporaryDirectory() as tmp:
           ]
           and "\nInstallations" in output
           and "\nApplying user-wide setup:" in output
+          and "\nVerifying baseline setup:" in output
+          and "\nVerifying startup hooks:" in output
           and output[-1] == "\nSetup complete.", str(output))
     state_mode = os.stat(state).st_mode & 0o777 if state.exists() else None
     check("guided setup records known installation locations",
           state.is_file() and state_mode == 0o600, str(state_mode))
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    plain = sandbox / "plain-directory"
+    home.mkdir()
+    plain.mkdir()
+    previous_cwd = Path.cwd()
+    output = []
+    try:
+        os.chdir(plain)
+        result = install.interactive_setup(
+            home=home,
+            input_fn=lambda _prompt: "2",
+            output=output.append,
+            check_online=False,
+            state_path=sandbox / "state.json",
+        )
+    finally:
+        os.chdir(previous_cwd)
+    check("project setup is hidden outside a detected project",
+          result == 0
+          and "Project    none detected" in output
+          and "  1. install for user" in output
+          and "  2. exit" in output
+          and not any("in project" in line for line in output),
+          str(output))
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    foreign = sandbox / "foreign"
+    home.mkdir()
+    project.mkdir()
+    foreign.mkdir()
+    install.install(["codex"], home, home)
+    foreign_source = foreign / install.BASELINE
+    foreign_source.write_bytes(bundled.content)
+    claude_link = home / ".claude" / install.BASELINE
+    claude_link.parent.mkdir()
+    claude_link.symlink_to(foreign_source)
+    (home / ".claude" / "CLAUDE.md").write_text(
+        "Existing Claude instructions.\n", encoding="utf-8"
+    )
+    answers = iter(["1", "1"])
+    output = []
+    result = install.interactive_setup(
+        home=home,
+        input_fn=lambda _prompt: next(answers),
+        output=output.append,
+        check_online=False,
+        state_path=sandbox / "state.json",
+        current_root=project,
+    )
+    check("guided setup reports incomplete tool installation as an error",
+          result == 2
+          and "  ! Claude Code incomplete" in output
+          and output[-1] == "\nSetup finished with unresolved items."
+          and not (home / ".claude" / "settings.json").exists(),
+          str(output))
 
 with tempfile.TemporaryDirectory() as tmp:
     sandbox = Path(tmp)
@@ -448,8 +550,8 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check("a user update defaults to the existing user scope and tools",
           result == 0
-          and any(prompt == "Choice [3]: " for prompt in prompts)
-          and any("currently installed: Codex" in prompt for prompt in prompts)
+          and any(prompt == "Choice [1]: " for prompt in prompts)
+          and any("keep installed (Codex)" in prompt for prompt in prompts)
           and (home / ".codex" / "AGENTS.md").is_symlink()
           and not (home / ".claude" / "rules").exists()
           and not (home / ".copilot" / "copilot-instructions.md").exists(),
@@ -487,14 +589,14 @@ with tempfile.TemporaryDirectory() as tmp:
         state_path=state,
         current_root=current,
     )
-    check("guided setup offers and applies registered project updates",
+    check("guided setup ignores projects outside the current scope",
           result == 0
-          and install.read_baseline(project / install.BASELINE).digest == bundled.digest,
-          str(output))
-    check("an update does not hide the next-action menu",
-          any("Update project" in prompt for prompt in prompts)
+          and install.read_baseline(project / install.BASELINE).digest
+              != bundled.digest
+          and not any("Update project" in prompt for prompt in prompts)
           and "\nWhat would you like to do?" in output
-          and "  1. install in project" in output,
+          and "  1. install for user" in output
+          and any(line.startswith("  2. install in project ") for line in output),
           f"prompts={prompts!r}, output={output!r}")
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -512,7 +614,7 @@ with tempfile.TemporaryDirectory() as tmp:
     install.record_installation(registry, previous, trusted=True)
     state = sandbox / "state.json"
     install.save_registry(state, registry)
-    answers = iter(["", "1", "2", "n"])
+    answers = iter(["", "2", "2", "n"])
     prompts = []
     output = []
 
@@ -528,11 +630,13 @@ with tempfile.TemporaryDirectory() as tmp:
         state_path=state,
         current_root=project,
     )
-    check("user-only setup clearly offers the current project",
+    check("the user-first menu clearly offers the current project",
           result == 0
           and any(line.startswith("  -") and "project" in line
                   and "not installed" in line for line in output)
-          and "  1. install in project" in output,
+          and "  1. tools for user" in output
+          and any(line.startswith("  2. install in project ")
+                  and str(project) in line for line in output),
           str(output))
     check("a user update can be followed by a project install",
           install.read_baseline(install.user_source(home)).digest == bundled.digest
@@ -563,7 +667,7 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     state = sandbox / "state.json"
     install.save_registry(state, registry)
-    answers = iter(["n", "n", "4"])
+    answers = iter(["n", "3"])
     prompts = []
 
     def decline_separate_updates(prompt: str) -> str:
@@ -581,10 +685,11 @@ with tempfile.TemporaryDirectory() as tmp:
     update_prompts = [
         prompt for prompt in prompts if prompt.lstrip().startswith("Update ")
     ]
-    check("different scopes receive separate update decisions",
-          len(update_prompts) == 2
-          and any("user-wide" in prompt for prompt in update_prompts)
-          and any("known-project" in prompt for prompt in update_prompts),
+    check("only the active scopes receive update decisions",
+          len(update_prompts) == 1
+          and "user-wide" in update_prompts[0]
+          and install.read_baseline(project / install.BASELINE).digest
+              != bundled.digest,
           str(prompts))
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -599,7 +704,7 @@ with tempfile.TemporaryDirectory() as tmp:
         bundled.baseline_id.encode(), b"aisec-0.0.1", 1
     )
     (target / install.BASELINE).write_bytes(old_content)
-    answers = iter(["2", str(target), "", "y", "2", "n"])
+    answers = iter(["", "y", "2", "2", "n"])
     output = []
     result = install.interactive_setup(
         home=home,
@@ -607,7 +712,7 @@ with tempfile.TemporaryDirectory() as tmp:
         output=output.append,
         check_online=False,
         state_path=sandbox / "state.json",
-        current_root=current,
+        current_root=target,
     )
     check("an unlinked project baseline is checked before tools are added",
           result == 0
