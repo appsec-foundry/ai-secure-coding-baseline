@@ -31,7 +31,7 @@ formally certified.
 ## Quick start
 
 ```bash
-curl --proto '=https' --fail --silent --show-error --output aisec-setup.sh https://raw.githubusercontent.com/appsec-foundry/ai-secure-coding-baseline/main/setup.sh && echo '0a47d6ebaef4b86867d1e75867213689863daf7e72da1ba2b97ddd54f7046441  aisec-setup.sh' | sha256sum --check && bash aisec-setup.sh
+curl --proto '=https' --fail --silent --show-error --output aisec-setup.sh https://raw.githubusercontent.com/appsec-foundry/ai-secure-coding-baseline/521500994cecb2c2bb2c6d8ab425ae58b9019386/setup.sh && echo '0a47d6ebaef4b86867d1e75867213689863daf7e72da1ba2b97ddd54f7046441  aisec-setup.sh' | sha256sum --check && bash aisec-setup.sh
 ```
 
 This needs no checkout. The bootstrap resolves the current `main` commit once,
@@ -178,14 +178,14 @@ user, and organization level.
 
 ### Remote setup (no checkout)
 
-The quick-start command downloads the upstream setup script, verifies its
-published SHA-256, and runs it only when that check succeeds. The inline hash
-pins the bootstrap content even while its URL uses `main`; it changes only when
-`setup.sh` itself changes. After startup, the script pins the current `main`
-commit and downloads the guided installer, baseline, and version-hook helper
-only from that commit. It requires Bash, `curl`, `sha256sum`, and Python 3 and
-deletes its temporary downloads on exit. The verified `aisec-setup.sh` remains
-available for inspection or manual deletion.
+The quick-start command downloads the setup script from a fixed bootstrap
+commit, verifies its published SHA-256, and runs it only when that check
+succeeds. The commit and inline hash change only when `setup.sh` itself changes.
+After startup, the script pins the current `main` commit and downloads the
+guided installer, baseline, and version-hook helper only from that commit. It
+requires Bash, `curl`, `sha256sum`, and Python 3 and deletes its temporary
+downloads on exit. The verified `aisec-setup.sh` remains available for
+inspection or manual deletion.
 
 For a path that does not execute remotely downloaded code, use the installer
 skill below. A repository clone is also supported.
