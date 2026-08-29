@@ -10,10 +10,10 @@ A short set of secure-coding rules for AI coding assistants. Add it to a
 project's instructions so Claude Code, Copilot, Codex, and other agents can
 apply it when they write or change code.
 
-> For Claude Code, use the
-> [appsec-advisor plugin](https://github.com/appsec-foundry/appsec-advisor).
+The [appsec-advisor](https://github.com/appsec-foundry/appsec-advisor) Claude
+Code plugin supports application-security work and can also manage this baseline.
 
-> **Limitations**
+> **Role**
 >
 > This baseline is an instruction layer, not an enforcement boundary. Its effect
 > depends on its place in an assistant's instruction hierarchy, and it cannot
