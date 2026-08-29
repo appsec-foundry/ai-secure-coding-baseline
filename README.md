@@ -24,21 +24,22 @@ apply it when they write or change code.
 > code. Pair it with project-specific instructions, reviews, tests, dependency
 > and secret scanning, and appropriate CI checks.
 
-The baseline is 19.5 KB and 3,883 GPT tokens (`o200k_base`); budget roughly
-4,000 Claude tokens. It has been refined through AI-assisted coding tasks, not
+The baseline is 19.5 KB and roughly 3,900 tokens, within its approximate
+4,000-token budget. It has been refined through AI-assisted coding tasks, not
 formally certified.
 
 ## Quick start
+
+The command below downloads a fixed version of the setup script and verifies
+its SHA-256 before running it:
 
 ```bash
 curl --proto '=https' --fail --silent --show-error --output aisec-setup.sh https://raw.githubusercontent.com/appsec-foundry/ai-secure-coding-baseline/521500994cecb2c2bb2c6d8ab425ae58b9019386/setup.sh && echo '0a47d6ebaef4b86867d1e75867213689863daf7e72da1ba2b97ddd54f7046441  aisec-setup.sh' | sha256sum --check && bash aisec-setup.sh
 ```
 
-This needs no checkout. The bootstrap resolves the current `main` commit once,
-downloads the installer inputs from that exact commit into a temporary
-directory, and starts the guided setup. It asks for scope and tools, keeps
-existing instruction files, and runs again for updates. All other paths are
-under [Using it](#using-it).
+The guided setup installs or updates the selected environments without a
+checkout and keeps existing instruction files. Other options are under
+[Using it](#using-it).
 
 ## Why this exists
 
@@ -178,14 +179,10 @@ user, and organization level.
 
 ### Remote setup (no checkout)
 
-The quick-start command downloads the setup script from a fixed bootstrap
-commit, verifies its published SHA-256, and runs it only when that check
-succeeds. The commit and inline hash change only when `setup.sh` itself changes.
-After startup, the script pins the current `main` commit and downloads the
-guided installer, baseline, and version-hook helper only from that commit. It
-requires Bash, `curl`, `sha256sum`, and Python 3 and deletes its temporary
-downloads on exit. The verified `aisec-setup.sh` remains available for
-inspection or manual deletion.
+The quick-start command downloads a fixed version of the setup script, verifies
+its SHA-256, and runs it only when the check succeeds. It requires Bash,
+`curl`, `sha256sum`, and Python 3. The downloaded `aisec-setup.sh` remains
+available for inspection or deletion.
 
 For a path that does not execute remotely downloaded code, use the installer
 skill below. A repository clone is also supported.
@@ -232,11 +229,12 @@ For normal setup and updates, run `make setup`; `make update` starts the same
 guided flow with the more discoverable update name. It shows the current
 project, the supported user-level locations, and projects managed by earlier
 runs.
-Choose a scope, then select tools by number or name; press Enter to select all
-tools shown. Project installs support Claude Code, Codex, and GitHub Copilot.
-User-wide installs support Claude Code, Codex, and Copilot CLI; Copilot account
-instructions for other surfaces must still be configured in the corresponding
-GitHub or IDE settings.
+Choose a scope, then select tools by number or name. For a new installation,
+Enter selects all tools. For an existing installation, Enter keeps its current
+tool selection; enter `all` to add every tool. Project installs support Claude
+Code, Codex, and GitHub Copilot. User-wide installs support Claude Code, Codex,
+and Copilot CLI; Copilot account instructions for other surfaces must still be
+configured in the corresponding GitHub or IDE settings.
 
 After installing the selected tools, the guided setup offers an optional
 session-start hook separately for any subset of those tools; Enter selects no

@@ -1162,13 +1162,32 @@ def choose_tools(
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
     tools: tuple[str, ...],
+    default_tools: list[str] | None = None,
 ) -> list[str] | None:
+    defaults = (
+        [tool for tool in default_tools if tool in tools]
+        if default_tools is not None
+        else list(tools)
+    )
+    if not defaults:
+        defaults = list(tools)
+    if defaults == list(tools):
+        default_label = "all"
+    else:
+        default_label = "currently installed: " + ", ".join(
+            TOOL_LABELS[tool] for tool in defaults
+        )
     output("\nChoose one or more tools:")
     for number, tool in enumerate(tools, 1):
         output(f"  {number}. {TOOL_LABELS[tool]}")
     for _ in range(3):
-        answer = _read_answer(input_fn, "Tools (comma-separated; Enter = all): ")
-        if not answer or answer.lower() == "all":
+        answer = _read_answer(
+            input_fn,
+            f"Tools (comma-separated; Enter = {default_label}; all = all): ",
+        )
+        if not answer:
+            return defaults
+        if answer.lower() == "all":
             return list(tools)
         chosen: list[str] = []
         valid = True
@@ -1356,7 +1375,8 @@ def _show_setup_status(
     rows += [_installation_row(item, available, current_root) for item in user]
     rows += [_installation_row(item, available, current_root) for item in other]
 
-    output("\nInstalled")
+    output("\nInstallations")
+    output("  ✓ current  ↻ update available  • review needed  - not installed")
     _show_rows(output, rows)
 
 
@@ -1385,6 +1405,7 @@ def _review_updates(
     reviewed: set[Path],
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
+    updated_installations: list[Installation] | None = None,
 ) -> bool:
     outdated = [
         item
@@ -1419,6 +1440,8 @@ def _review_updates(
             output(f"  {line}")
         if updated:
             record_installation(registry, updated, trusted=True)
+            if updated_installations is not None:
+                updated_installations.append(updated)
             changed = True
     return changed
 
@@ -1488,12 +1511,14 @@ def _install_project_interactively(
         output,
     )
 
-    tools = choose_tools(input_fn, output, TOOLS)
+    default_tools = list(existing.tools) if existing and existing.tools else None
+    tools = choose_tools(input_fn, output, TOOLS, default_tools)
     if not tools:
         output("Setup cancelled.")
         return changed
+    output("\nApplying project setup:")
     for line in install(tools, root, None, content=available.content):
-        output(line)
+        output(f"  {line}")
     projects = registry.get("projects", {})
     entry = projects.get(str(root)) if isinstance(projects, dict) else None
     installed = scan_project(root, entry if isinstance(entry, dict) else {})
@@ -1540,12 +1565,20 @@ def _install_user_interactively(
                 record_installation(registry, migrated, trusted=True)
                 changed = True
 
-    tools = choose_tools(input_fn, output, TOOLS)
+    default_tools: list[str] = []
+    for installation in existing:
+        if installation.kind not in {"user", "legacy-user"}:
+            continue
+        for tool in installation.tools:
+            if tool not in default_tools:
+                default_tools.append(tool)
+    tools = choose_tools(input_fn, output, TOOLS, default_tools or None)
     if not tools:
         output("Setup cancelled.")
         return changed
+    output("\nApplying user-wide setup:")
     for line in install(tools, Path.cwd(), home, content=available.content):
-        output(line)
+        output(f"  {line}")
     user_entry = registry.get("user")
     managed = [
         item
@@ -1582,6 +1615,10 @@ def interactive_setup(
     state_path: Path | None = None,
     current_root: Path | None = None,
 ) -> int:
+    output("AI Secure Coding Baseline setup")
+    output("Install or update the baseline for Claude Code, Codex, and Copilot.")
+    output("Existing instruction files are preserved; conflicts are reported.")
+    output("\nChecking the available baseline...")
     available, online_note = latest_available(check_online)
     state_path = state_path or registry_path(home)
     registry, registry_writable, registry_note = load_registry(state_path)
@@ -1589,7 +1626,6 @@ def interactive_setup(
     if current_root == Path(current_root.anchor) or not current_root.is_dir():
         raise ValueError("current project must be an existing non-root directory")
 
-    output("AI Secure Coding Baseline setup")
     output(f"Available  {available.baseline_id}  ({available.origin}{online_note})")
     output(f"Project    {display_path(current_root)}")
     if registry_note:
@@ -1598,6 +1634,7 @@ def interactive_setup(
     _show_setup_status(output, installations, available, home, current_root)
 
     reviewed_updates: set[Path] = set()
+    updated_installations: list[Installation] = []
     changed = _review_updates(
         installations,
         available,
@@ -1605,6 +1642,7 @@ def interactive_setup(
         reviewed_updates,
         input_fn,
         output,
+        updated_installations,
     )
     if changed:
         _save_setup_registry(state_path, registry, registry_writable, output)
@@ -1617,13 +1655,28 @@ def interactive_setup(
     user_installed = any(item.kind in {"user", "legacy-user"} for item in installations)
     current_action = "tools in project" if current_installed else "install in project"
     user_action = "tools for user" if user_installed else "install for user"
-    output(
-        f"\nNext  [1] {current_action}  [2] another project  "
-        f"[3] {user_action}  [4] exit"
-    )
+    default_choice = ""
+    for installation in reversed(updated_installations):
+        if installation.kind in {"user", "legacy-user"}:
+            default_choice = "3"
+            break
+        if (
+            installation.kind == "project"
+            and installation.root.resolve(strict=False)
+            == current_root.resolve(strict=False)
+        ):
+            default_choice = "1"
+            break
+    if not default_choice:
+        default_choice = "1" if current_installed else "3" if user_installed else "4"
+    output("\nWhat would you like to do?")
+    output(f"  1. {current_action}")
+    output("  2. choose another project")
+    output(f"  3. {user_action}")
+    output("  4. exit")
     choice = ""
     for _ in range(3):
-        choice = _read_answer(input_fn, "Choice [4]: ") or "4"
+        choice = _read_answer(input_fn, f"Choice [{default_choice}]: ") or default_choice
         if choice in {"1", "2", "3", "4"}:
             break
         output("Invalid selection. Choose 1, 2, 3, or 4.")
@@ -1655,6 +1708,10 @@ def interactive_setup(
         _save_setup_registry(state_path, registry, registry_writable, output)
     if choice == "4":
         output("Setup complete." if changed else "No changes made.")
+    elif action_changed:
+        output("\nSetup complete.")
+    else:
+        output("\nNo additional changes made.")
     return 0
 
 

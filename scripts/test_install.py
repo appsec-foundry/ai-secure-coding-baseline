@@ -150,6 +150,17 @@ check("guided tool selection clearly supports multiple tools",
       f"prompts={tool_prompts!r}, output={tool_output!r}")
 all_tools = install.choose_tools(lambda _prompt: "", lambda _line: None, install.TOOLS)
 check("guided setup defaults to all three tools", all_tools == list(install.TOOLS))
+existing_tool_prompts: list[str] = []
+existing_tools = install.choose_tools(
+    lambda prompt: existing_tool_prompts.append(prompt) or "",
+    lambda _line: None,
+    install.TOOLS,
+    ["codex"],
+)
+check("existing scopes default to their installed tools",
+      existing_tools == ["codex"]
+      and any("currently installed: Codex" in prompt
+              for prompt in existing_tool_prompts), str(existing_tool_prompts))
 hook_output: list[str] = []
 hook_prompts: list[str] = []
 hook_tools = install.choose_hook_tools(
@@ -392,9 +403,52 @@ with tempfile.TemporaryDirectory() as tmp:
           and (home / ".codex" / "hooks.json").is_file()
           and (home / ".copilot" / "hooks"
                / install.COPILOT_VERSION_HOOK_NAME).is_file(), str(output))
+    check("guided setup explains its purpose and progress",
+          output[:4] == [
+              "AI Secure Coding Baseline setup",
+              "Install or update the baseline for Claude Code, Codex, and Copilot.",
+              "Existing instruction files are preserved; conflicts are reported.",
+              "\nChecking the available baseline...",
+          ]
+          and "\nInstallations" in output
+          and "\nApplying user-wide setup:" in output
+          and output[-1] == "\nSetup complete.", str(output))
     state_mode = os.stat(state).st_mode & 0o777 if state.exists() else None
     check("guided setup records known installation locations",
           state.is_file() and state_mode == 0o600, str(state_mode))
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+    old_content = bundled.content.replace(
+        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+    )
+    install.install(["codex"], home, home, content=old_content)
+    previous = [item for item in install.scan_user(home, {}) if item.kind == "user"][0]
+    registry = install.empty_registry()
+    install.record_installation(registry, previous, trusted=True)
+    state = sandbox / "state.json"
+    install.save_registry(state, registry)
+    prompts: list[str] = []
+    result = install.interactive_setup(
+        home=home,
+        input_fn=lambda prompt: prompts.append(prompt) or "",
+        output=lambda _line: None,
+        check_online=False,
+        state_path=state,
+        current_root=project,
+    )
+    check("a user update defaults to the existing user scope and tools",
+          result == 0
+          and any(prompt == "Choice [3]: " for prompt in prompts)
+          and any("currently installed: Codex" in prompt for prompt in prompts)
+          and (home / ".codex" / "AGENTS.md").is_symlink()
+          and not (home / ".claude" / "rules").exists()
+          and not (home / ".copilot" / "copilot-instructions.md").exists(),
+          str(prompts))
 
 with tempfile.TemporaryDirectory() as tmp:
     sandbox = Path(tmp)
@@ -434,7 +488,8 @@ with tempfile.TemporaryDirectory() as tmp:
           str(output))
     check("an update does not hide the next-action menu",
           any("Update project" in prompt for prompt in prompts)
-          and any(line.startswith("\nNext  [1]") for line in output),
+          and "\nWhat would you like to do?" in output
+          and "  1. install in project" in output,
           f"prompts={prompts!r}, output={output!r}")
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -472,7 +527,7 @@ with tempfile.TemporaryDirectory() as tmp:
           result == 0
           and any(line.startswith("  -") and "project" in line
                   and "not installed" in line for line in output)
-          and any("[1] install in project" in line for line in output),
+          and "  1. install in project" in output,
           str(output))
     check("a user update can be followed by a project install",
           install.read_baseline(install.user_source(home)).digest == bundled.digest

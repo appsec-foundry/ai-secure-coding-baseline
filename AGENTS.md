@@ -10,6 +10,11 @@ exactly as in any project that installs it. It is referenced, not embedded —
 open it, or the rules are not in your context at all.
 
 [`README.md`](README.md) explains why the baseline exists and what it covers.
+Keep it clear, concise, and written for users: lead with the action and outcome,
+avoid implementation details or extended explanations unless they are needed
+for safe use, a necessary decision, or troubleshooting, and do not duplicate
+the code's internal workflow.
+
 Four limits from it bind every edit to the baseline text:
 
 - It stays compact. Size is a criterion, not only correctness; the README states
