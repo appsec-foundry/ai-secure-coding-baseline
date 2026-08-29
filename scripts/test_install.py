@@ -561,6 +561,46 @@ with tempfile.TemporaryDirectory() as tmp:
     sandbox = Path(tmp)
     home = sandbox / "home"
     project = sandbox / "project"
+    checkout = sandbox / "checkout"
+    home.mkdir()
+    project.mkdir()
+    checkout.mkdir()
+    source = checkout / install.BASELINE
+    source.write_bytes(bundled.content)
+    claude_link = home / ".claude" / install.BASELINE
+    claude_link.parent.mkdir()
+    claude_link.symlink_to(source)
+    (home / ".claude" / "CLAUDE.md").write_text(
+        f"@{claude_link}\n", encoding="utf-8"
+    )
+    prompts = []
+    answers = iter(["1", "n", "1"])
+
+    def decline_migration(prompt: str) -> str:
+        prompts.append(prompt)
+        return next(answers)
+
+    result = install.interactive_setup(
+        home=home,
+        input_fn=decline_migration,
+        output=lambda _line: None,
+        check_online=False,
+        state_path=sandbox / "state.json",
+        current_root=project,
+    )
+    check("the migration prompt explains the change and its benefit",
+          result == 2
+          and any(
+              "Claude Code currently loads the baseline from a repository checkout."
+              in prompt
+              and "keeps working if that checkout is moved or removed" in prompt
+              for prompt in prompts
+          ), str(prompts))
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
     home.mkdir()
     project.mkdir()
     old_content = bundled.content.replace(
@@ -732,8 +772,11 @@ with tempfile.TemporaryDirectory() as tmp:
 setup_script = install.REPO / "setup.sh"
 setup_digest = hashlib.sha256(setup_script.read_bytes()).hexdigest()
 readme = (install.REPO / "README.md").read_text(encoding="utf-8")
+quick_start = readme.split("## Quick start", 1)[1].split("\n## ", 1)[0]
+normalized_quick_start = " ".join(quick_start.split())
 check("the quick start pins the exact remote bootstrap content",
-      f"echo '{setup_digest}  aisec-setup.sh' | sha256sum --check" in readme)
+      f"echo '{setup_digest} aisec-setup.sh' | sha256sum --check"
+      in normalized_quick_start)
 completed = subprocess.run(
     ["bash", str(setup_script), "--help"],
     capture_output=True,

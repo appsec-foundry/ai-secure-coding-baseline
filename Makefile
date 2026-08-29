@@ -13,7 +13,6 @@ check:
 	python3 examples/claude-code-gate/test_gate.py
 	python3 scripts/test_spec_guard.py
 	python3 scripts/test_install.py
-	python3 scripts/test_skill_installer.py
 
 ## setup       guided install and update; ARGS=--offline skips the release check
 setup:

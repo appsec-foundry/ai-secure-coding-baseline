@@ -1,4 +1,0 @@
-interface:
-  display_name: "AI Secure Coding Baseline Installer"
-  short_description: "Install, check, and safely update the baseline"
-  default_prompt: "Use $secure-coding-baseline-installer to check this project's baseline against the official upstream."

@@ -34,7 +34,13 @@ The command below downloads a fixed version of the setup script and verifies
 its SHA-256 before running it:
 
 ```bash
-curl --proto '=https' --fail --silent --show-error --output aisec-setup.sh https://raw.githubusercontent.com/appsec-foundry/ai-secure-coding-baseline/521500994cecb2c2bb2c6d8ab425ae58b9019386/setup.sh && echo '0a47d6ebaef4b86867d1e75867213689863daf7e72da1ba2b97ddd54f7046441  aisec-setup.sh' | sha256sum --check && bash aisec-setup.sh
+curl --proto '=https' \
+  --fail --silent --show-error \
+  --output aisec-setup.sh \
+  https://raw.githubusercontent.com/appsec-foundry/ai-secure-coding-baseline/521500994cecb2c2bb2c6d8ab425ae58b9019386/setup.sh &&
+echo '0a47d6ebaef4b86867d1e75867213689863daf7e72da1ba2b97ddd54f7046441  aisec-setup.sh' |
+  sha256sum --check &&
+bash aisec-setup.sh
 ```
 
 The guided setup installs or updates the selected environments without a
@@ -46,6 +52,10 @@ checkout and keeps existing instruction files. Other options are under
 AI coding assistants know many security practices but do not apply them
 consistently, especially under pressure. This baseline makes the expected
 behavior explicit and tells assistants which shortcuts to avoid.
+Without shared rules, one change may use the project's security mechanisms
+while the next omits authorization or disables verification to make something
+work. The baseline keeps the same expectations present across tools and
+sessions without repeating them in every prompt.
 
 ## Background
 
@@ -68,10 +78,11 @@ for example, explicit rules reduced shortcut behavior to 8.3%, not to zero
 Security requirements that must not be violated need controls outside the
 model. Use permission boundaries to restrict actions, deterministic guards for
 violations they can judge reliably, and tests, CI checks, or runtime controls
-for results that require wider context. The
-[`example gate`](examples/claude-code-gate/) shows both the value and the limit
-of a simple blocking hook; work on executable constraints reports the same gap
-between passive instructions and enforceable checks
+for results that require wider context. For teams that want to go one step
+further, the optional [`Claude Code gate`](examples/claude-code-gate/) extends
+the baseline with two deterministic checks before an edit is written. It also
+shows the limit of a simple blocking hook; work on executable constraints
+reports the same gap between passive instructions and enforceable checks
 ([Sharma, 2026](https://arxiv.org/abs/2603.00822)).
 
 ## Covered risks
@@ -183,29 +194,6 @@ The quick-start command downloads a fixed version of the setup script, verifies
 its SHA-256, and runs it only when the check succeeds. It requires Bash,
 `curl`, `sha256sum`, and Python 3. The downloaded `aisec-setup.sh` remains
 available for inspection or deletion.
-
-For a path that does not execute remotely downloaded code, use the installer
-skill below. A repository clone is also supported.
-
-### Installer skill (no checkout)
-
-Skill-capable agents can install
-[`secure-coding-baseline-installer`](skills/secure-coding-baseline-installer/)
-directly from this repository. For example, ask the agent's skill installer to
-resolve a release tag or the current `main` commit and install:
-
-```text
-https://github.com/appsec-foundry/ai-secure-coding-baseline/tree/<release-tag-or-commit>/skills/secure-coding-baseline-installer
-```
-
-Pin the executable skill package to that tag or commit rather than downloading
-it from a mutable branch name.
-
-Then invoke `$secure-coding-baseline-installer` to check, install, or update a
-project or user-wide baseline. The skill accepts content only from this
-repository, prefers a stable release, and otherwise pins `main` to a specific
-commit before downloading the baseline. It does not require the AppSec plugin
-or a repository checkout and never downloads or executes remote code.
 
 ### From a repository clone
 

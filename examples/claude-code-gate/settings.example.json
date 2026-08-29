@@ -2,11 +2,15 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "matcher": "Write|Edit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/examples/claude-code-gate/gate.py\""
+            "command": "python3",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/examples/claude-code-gate/gate.py"
+            ],
+            "timeout": 10
           }
         ]
       }

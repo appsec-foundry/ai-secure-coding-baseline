@@ -1669,9 +1669,33 @@ def _install_user_interactively(
         for item in existing
         if item.kind == "legacy-user" and _update_key(item) not in reviewed_updates
     ]
-    if legacy and ask_yes_no(
-        input_fn, "Move checkout-linked user installation to managed storage?", True
-    ):
+    if legacy:
+        legacy_tools = [
+            tool
+            for tool in TOOLS
+            if any(tool in installation.tools for installation in legacy)
+        ]
+        legacy_labels = [TOOL_LABELS[tool] for tool in legacy_tools]
+        if not legacy_labels:
+            legacy_subject = "This user installation"
+            legacy_verb = "loads"
+            legacy_pronoun = "it"
+        elif len(legacy_labels) == 1:
+            legacy_subject = legacy_labels[0]
+            legacy_verb = "loads"
+            legacy_pronoun = "it"
+        else:
+            legacy_subject = (
+                ", ".join(legacy_labels[:-1]) + f" and {legacy_labels[-1]}"
+            )
+            legacy_verb = "load"
+            legacy_pronoun = "they"
+        migration_question = (
+            f"{legacy_subject} currently {legacy_verb} the baseline from a repository "
+            "checkout. Use a user-wide copy instead so "
+            f"{legacy_pronoun} keeps working if that checkout is moved or removed?"
+        )
+    if legacy and ask_yes_no(input_fn, migration_question, True):
         for installation in legacy:
             reviewed_updates.add(_update_key(installation))
             report, migrated = migrate_legacy_user(installation, available)
