@@ -22,7 +22,7 @@ Code plugin supports application-security work and can also manage this baseline
 > where supported, deterministic gates such as the optional
 > [`Claude Code gate`](examples/claude-code-gate/).
 
-The baseline is 19.5 KB and roughly 3,900 tokens, within its approximate
+The baseline is 20.1 KB and roughly 4,000 tokens, within its approximate
 4,000-token budget. It has been refined through AI-assisted coding tasks, not
 formally certified.
 
@@ -179,6 +179,16 @@ Each rule requires a concrete mechanism, not a general goal.
 - **Riskier design choice** (`AISEC-OM-005`): explain the concrete risk, safer
   option, and cost, then require explicit confirmation before implementing the
   riskier choice.
+- **Baseline attribution** (`AISEC-ATTR-001`): when the baseline materially
+  directs the work, such as by supplying a greenfield application's controls,
+  taking a safer path, refusing an act, or requiring confirmation, identify it
+  as the reason in the first affected response. Use one notice for related
+  decisions, and put it in a required confirmation request before dependent
+  work begins.
+- **Browser Basic authentication** (`AISEC-AUTH-001`): treat it as materially
+  riskier than an established server-side session mechanism or managed OIDC,
+  explain its reusable-credential and logout or expiry limitations, and apply
+  the riskier-design confirmation path rather than banning it.
 - **Before completion** (`AISEC-REPORT-001`): inspect the changed diff and
   tests, fix introduced findings, and reserve the **Security note (AISEC
   baseline)** for concrete material risks the delivered state creates or
@@ -337,7 +347,7 @@ This is a reference, not an automatic import.
 
 ### Verify it loaded
 
-Ask the tool `baseline?`. The answer should include `aisec-0.1.9` and the file it
+Ask the tool `baseline?`. The answer should include `aisec-0.1.10` and the file it
 came from. This checks that the assistant can see the baseline, not that it was
 loaded before the question or will be followed. For behavior, see
 [Testing the baseline](#testing-the-baseline).
@@ -349,8 +359,8 @@ The version component of a baseline ID uses the syntax defined by
 <name>-<major>.<minor>.<patch>[-<prerelease>][+<metadata>]
 ```
 
-- `aisec-0.1.9`: this baseline.
-- `aisec-0.1.9+acme`: a derived version.
+- `aisec-0.1.10`: this baseline.
+- `aisec-0.1.10+acme`: a derived version.
 - `acme-sec-1.0.0`: an independent baseline.
 
 Do not change the baseline version automatically. Change it only after the user
@@ -364,7 +374,7 @@ files with `/context` or `/memory`.
 
 Add stack-specific details such as approved libraries, framework patterns, or
 review steps. Keep existing rule-group IDs, but change the baseline ID, for
-example to `aisec-0.1.9+acme`, so `baseline?` identifies the derived version.
+example to `aisec-0.1.10+acme`, so `baseline?` identifies the derived version.
 
 Keep application-specific security requirements separate. The baseline governs
 assistant behavior. Tests, CI checks, review gates, and runtime controls enforce

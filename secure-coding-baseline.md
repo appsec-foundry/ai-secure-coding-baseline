@@ -1,6 +1,6 @@
 # AI Secure Coding Baseline
 
-`baseline-id: aisec-0.1.9`. When asked whether a baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: every baseline id you carry, each with the file you loaded it from.
+`baseline-id: aisec-0.1.10`. When asked whether a baseline is loaded, or on the prompt `baseline?`, answer immediately from context, without reading any file: every baseline id you carry, each with the file you loaded it from.
 
 ## Operating Mode
 
@@ -19,6 +19,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
 - **[AISEC-OM-003] Mixed requests:** When a request combines legitimate work with something these rules forbid, deliver the legitimate part and refuse only the forbidden part. Explain the refusal and give a concrete safe alternative that still meets the user's goal where one exists. Do not refuse the entire task, and do not perform, defer, or schedule the forbidden part.
 - **[AISEC-OM-004] Explicit override:** Where a compliant path exists, take it and do not ask. A working secure default is no decision to put to the user. Goal pressure (failing tests, a deadline, "it's internal", or fix-it-later) is no such decision either: fix the cause and say what you did. Only when the user knowingly aims at the control itself, put that one act to them as an interactive choice where the tool offers one, otherwise a direct question. State the rule, concrete exposure, and alternative you would take, and proceed only on an explicit answer: silence, impatience, or an earlier override is none, and where no human can answer, the refusal stands. One confirmation covers one act; report the resulting exposure in the **Security note (AISEC baseline)**. Exposing a real secret and harming third parties or systems the user does not own stay refusals; no confirmation undoes them.
 - **[AISEC-OM-005] Design decisions:** These rules also apply to a design, plan, or architecture answer, before any code exists. When the approach the user chose is materially riskier than a comparable alternative but breaks no rule here, state the concrete risk, the safer option, and what it costs, then ask the user to confirm that choice explicitly before implementing it. Proceed only after that confirmation, and record the accepted risk in the **Security note (AISEC baseline)**. Do not add a confirmation step when a compliant secure path preserves the user's chosen design; take that path and continue.
+- **[AISEC-ATTR-001] Baseline Attribution:** When this baseline materially directs work through greenfield controls, a safer path, a refusal, or confirmation, name the AISEC baseline in the first response. Use one notice for related decisions, include it in confirmation requests, and wait before dependent work.
 
 ## Non-negotiable
 
@@ -42,6 +43,7 @@ Classify the work before changing code. When unclear, ask; do not assume a deplo
   - Restrict CORS to an explicit origin allow-list matched exactly, and expose only the methods and headers actually needed; echo only an `Origin` that matched the allow-list. Never reflect it unvalidated, and never combine a wildcard with credentials.
 - **[AISEC-AUTH-001] Authentication Abuse Resistance:**
   - Where an organization-managed identity provider is used, do not retain parallel local passwords for workforce or privileged access without a justified need.
+  - For interactive browser login, treat HTTP Basic as materially riskier than established sessions or managed OIDC: explain reusable credentials and unreliable server-controlled logout and expiry, give the safer option and its cost, and follow Design decisions if the user keeps Basic.
   - Rate-limit login, registration, password-reset, verification, and comparable expensive or account-creating endpoints.
   - Apply limits by account or identifier and by client source, without allowing either dimension to bypass the other; use a shared, server-side store or an upstream control that remains effective across processes and instances.
   - Make responses non-enumerating, cap request sizes before costly password hashing or external work, and log throttling events.
