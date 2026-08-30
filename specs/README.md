@@ -52,7 +52,7 @@ worked examples in `archive/`, the smallest being
 
 ## Requirement IDs
 
-Every rule group in the baseline carries an ID like `AISEC-AUTH-001`. The ID
+Every rule group in the baseline carries an ID like `AISCB-AUTH-001`. The ID
 belongs to the behavior, not to the heading or the line: reword the rule and it
 keeps its ID. Split a group and the new half gets a new ID. Remove a group and
 its ID retires; never reuse it.

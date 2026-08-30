@@ -32,7 +32,7 @@ REGISTRY_FILE = ".config/ai-secure-coding-baseline/installations.json"
 sys.path.insert(0, str(HELPER.parent))
 import show_baseline_version as hook  # noqa: E402
 
-VALID_ID = "aisec-0.1.10"
+VALID_ID = "aiscb-0.1.10"
 VALID = f"# AI Secure Coding Baseline\n\n`baseline-id: {VALID_ID}`\n\nRules follow.\n"
 
 # The installer may place the baseline beside the helper or one level above it.
@@ -44,11 +44,11 @@ READ_FAILURES = [
     ("empty baseline", {BASELINE: ""}),
     ("no baseline ID", {BASELINE: "# Heading\n\nNo identifier here.\n"}),
     ("two baseline IDs",
-     {BASELINE: f"`baseline-id: {VALID_ID}`\n\n`baseline-id: aisec-0.2.0`\n"}),
+     {BASELINE: f"`baseline-id: {VALID_ID}`\n\n`baseline-id: aiscb-0.2.0`\n"}),
     ("ID not at line start", {BASELINE: f"see `baseline-id: {VALID_ID}`\n"}),
-    ("malformed version", {BASELINE: "`baseline-id: aisec-1.2`\n"}),
-    ("leading zero in the version", {BASELINE: "`baseline-id: aisec-0.01.0`\n"}),
-    ("invalid UTF-8", {BASELINE: b"`baseline-id: aisec-0.1.10`\n\xff\xfe\n"}),
+    ("malformed version", {BASELINE: "`baseline-id: aiscb-1.2`\n"}),
+    ("leading zero in the version", {BASELINE: "`baseline-id: aiscb-0.01.0`\n"}),
+    ("invalid UTF-8", {BASELINE: b"`baseline-id: aiscb-0.1.10`\n\xff\xfe\n"}),
     ("one byte over the size limit",
      {BASELINE: VALID + "x" * (MAX_BASELINE_BYTES - len(VALID) + 1)}),
     ("a symlinked baseline", {BASELINE: ("symlink", "elsewhere.md"),
@@ -147,8 +147,8 @@ def check_success(failures: list[str]) -> None:
     # A baseline beside the helper wins over one above it, and nothing further
     # up the tree is searched, so an unrelated baseline cannot be picked up.
     code, out, _ = call({**ABOVE,
-                         "scripts/" + BASELINE: VALID.replace(VALID_ID, "aisec-9.9.9")})
-    if "aisec-9.9.9" not in out:
+                         "scripts/" + BASELINE: VALID.replace(VALID_ID, "aiscb-9.9.9")})
+    if "aiscb-9.9.9" not in out:
         failures.append(f"baseline beside the helper must win: {out[:120]!r}")
 
 
@@ -178,24 +178,24 @@ def check_update_note(failures: list[str]) -> None:
     """Only a genuinely newer release of this baseline is announced."""
     silent = [
         ("the same version", {"latest": VALID_ID}),
-        ("an older release", {"latest": "aisec-0.1.9"}),
+        ("an older release", {"latest": "aiscb-0.1.9"}),
         ("another baseline's name", {"latest": "acme-9.9.9"}),
         ("a value that is not a version", {"latest": "; rm -rf /"}),
         ("a missing version", {"enabled": False}),
-        ("a section that is not an object", "aisec-9.9.9"),
+        ("a section that is not an object", "aiscb-9.9.9"),
     ]
     for label, section in silent:
         code, out, _ = call(registry_layout(section))
         if code != 0 or "Update" in out:
             failures.append(f"{label}: expected no note, got {out[:160]!r}")
 
-    code, out, _ = call(registry_layout({"latest": "aisec-0.2.0"}))
-    if code != 0 or "Update aisec-0.2.0 available" not in out:
+    code, out, _ = call(registry_layout({"latest": "aiscb-0.2.0"}))
+    if code != 0 or "Update aiscb-0.2.0 available" not in out:
         failures.append(f"a newer release must be announced: {out[:160]!r}")
     if "python3" in out:
         failures.append(f"no installer means no command: {out[:160]!r}")
 
-    root = build({**registry_layout({"latest": "aisec-0.2.0"}),
+    root = build({**registry_layout({"latest": "aiscb-0.2.0"}),
                   "scripts/install.py": "raise SystemExit(0)\n"})
     _code, out, _err = call_in(root)
     if f"python3 {root / 'scripts' / 'install.py'} --interactive" not in out:

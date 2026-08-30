@@ -50,7 +50,7 @@ if [ "${#source_ref}" -ne 40 ]; then
     exit 2
 fi
 
-setup_tmp=$(mktemp -d "${TMPDIR:-/tmp}/aisec-setup.XXXXXX")
+setup_tmp=$(mktemp -d "${TMPDIR:-/tmp}/aiscb-setup.XXXXXX")
 cleanup() {
     if [ -d "$setup_tmp" ]; then
         rm -r -- "$setup_tmp"

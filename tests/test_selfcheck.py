@@ -21,31 +21,31 @@ HERE = Path(__file__).resolve().parent
 BASELINE = """\
 # Demo baseline
 
-`baseline-id: aisec-0.1.0`
+`baseline-id: aiscb-0.1.0`
 
 ## Non-negotiable
 
-- **[AISEC-DEMO-001] First rule:** Do the safe thing.
-- **[AISEC-DEMO-002] Second rule:** Do it again.
+- **[AISCB-DEMO-001] First rule:** Do the safe thing.
+- **[AISCB-DEMO-002] Second rule:** Do it again.
 """
 
 CATALOG = """\
 # Secure coding requirements catalog
 
-## AISEC-DEMO-001 — First rule
+## AISCB-DEMO-001 — First rule
 
 **Section:** Non-negotiable
-**Normative source:** `secure-coding-baseline.md`, rule group `AISEC-DEMO-001`.
+**Normative source:** `secure-coding-baseline.md`, rule group `AISCB-DEMO-001`.
 **Applies when:** The demo runs.
 **Requirement:** Do the safe thing.
 **Observable acceptance:** The result is safe.
 **Model cases:** `demo-case`
 **Evidence and gaps:** Partial. One demo case covers it.
 
-## AISEC-DEMO-002 — Second rule
+## AISCB-DEMO-002 — Second rule
 
 **Section:** Non-negotiable
-**Normative source:** `secure-coding-baseline.md`, rule group `AISEC-DEMO-002`.
+**Normative source:** `secure-coding-baseline.md`, rule group `AISCB-DEMO-002`.
 **Applies when:** The demo runs again.
 **Requirement:** Repeat the safe action.
 **Observable acceptance:** The result is safe again.
@@ -57,7 +57,7 @@ CHECKS = """\
 {
   "mode": "greenfield",
   "why": "A minimal valid case for guard tests.",
-  "requirements": ["AISEC-DEMO-001"],
+  "requirements": ["AISCB-DEMO-001"],
   "reply_required_regex": [{"id": "says-something", "pattern": "safe"}]
 }
 """
@@ -113,9 +113,9 @@ Before doing any repository work, read and follow
 README = """\
 # Demo baseline
 
-Ask the tool `baseline?`. The answer should include `aisec-0.1.0`.
+Ask the tool `baseline?`. The answer should include `aiscb-0.1.0`.
 
-- `aisec-0.1.0`: this baseline.
+- `aiscb-0.1.0`: this baseline.
 """
 
 
@@ -180,12 +180,12 @@ CASES = [
                      '"id": "turn-1-reaction"', '"name": "turn-1-reaction"')),
      "judge item 0 has no id"),
     ("baseline id is not SemVer",
-     lambda r: edit(r / "secure-coding-baseline.md", "aisec-0.1.0", "aisec-0.1"),
+     lambda r: edit(r / "secure-coding-baseline.md", "aiscb-0.1.0", "aiscb-0.1"),
      "does not use Semantic Versioning"),
     ("README current baseline id is stale",
-     lambda r: edit(r / "README.md", "- `aisec-0.1.0`: this baseline.",
-                    "- `aisec-0.1.1`: this baseline."),
-     "README current baseline id 'aisec-0.1.1' does not match"),
+     lambda r: edit(r / "README.md", "- `aiscb-0.1.0`: this baseline.",
+                    "- `aiscb-0.1.1`: this baseline."),
+     "README current baseline id 'aiscb-0.1.1' does not match"),
     ("agent baseline reference is missing",
      lambda r: (r / "AGENTS.md").write_text("# Repository instructions\n"),
      "AGENTS.md must require agents to read and follow"),
@@ -199,28 +199,28 @@ CASES = [
      "CLAUDE.md must import secure-coding-baseline.md exactly once"),
     ("rule group renamed in the baseline",
      lambda r: edit(r / "secure-coding-baseline.md", "First rule", "Renamed rule"),
-     "catalog calls AISEC-DEMO-001"),
+     "catalog calls AISCB-DEMO-001"),
     ("rule group added without a catalog entry",
      lambda r: edit(r / "secure-coding-baseline.md", "\n## Non",
-                    "\n- **[AISEC-DEMO-003] Third rule:** New.\n\n## Non"),
-     "catalog does not list 'AISEC-DEMO-003'"),
+                    "\n- **[AISCB-DEMO-003] Third rule:** New.\n\n## Non"),
+     "catalog does not list 'AISCB-DEMO-003'"),
     ("case coverage the catalog does not show",
      lambda r: edit(r / "tests" / "cases" / "demo-case" / "checks.json",
-                    '["AISEC-DEMO-001"]', '["AISEC-DEMO-001", "AISEC-DEMO-002"]'),
-     "catalog cases for AISEC-DEMO-002"),
+                    '["AISCB-DEMO-001"]', '["AISCB-DEMO-001", "AISCB-DEMO-002"]'),
+     "catalog cases for AISCB-DEMO-002"),
     ("case pointing at an id that does not exist",
      lambda r: edit(r / "tests" / "cases" / "demo-case" / "checks.json",
-                    "AISEC-DEMO-001", "AISEC-GONE-001"),
+                    "AISCB-DEMO-001", "AISCB-GONE-001"),
      "unknown requirement id"),
     ("duplicate id in the baseline",
-     lambda r: edit(r / "secure-coding-baseline.md", "AISEC-DEMO-002", "AISEC-DEMO-001"),
+     lambda r: edit(r / "secure-coding-baseline.md", "AISCB-DEMO-002", "AISCB-DEMO-001"),
      "duplicate requirement id"),
     ("malformed id in the baseline",
-     lambda r: edit(r / "secure-coding-baseline.md", "AISEC-DEMO-002", "AISEC-demo-002"),
+     lambda r: edit(r / "secure-coding-baseline.md", "AISCB-DEMO-002", "AISCB-demo-002"),
      "malformed requirement id"),
     ("rule group without an id",
      lambda r: edit(r / "secure-coding-baseline.md",
-                    "- **[AISEC-DEMO-002] Second rule:**",
+                    "- **[AISCB-DEMO-002] Second rule:**",
                     "- **Second rule:**"),
      "has no valid requirement id"),
     ("catalog entry missing its requirement text",
@@ -287,11 +287,11 @@ CASES = [
 sys.path.insert(0, str(HERE))
 import selfcheck  # noqa: E402
 
-DEMO_IDS = {"AISEC-DEMO-001", "AISEC-DEMO-002"}
+DEMO_IDS = {"AISCB-DEMO-001", "AISCB-DEMO-002"}
 VALID_CHECKS = {
     "mode": "greenfield",
     "why": "A minimal valid case for guard tests.",
-    "requirements": ["AISEC-DEMO-001"],
+    "requirements": ["AISCB-DEMO-001"],
     "reply_required_regex": [{"id": "says-something", "pattern": "safe"}],
 }
 VALID_TURN = {
@@ -346,9 +346,9 @@ SCHEMA_CASES = [
     ("a non-string requirement id", with_checks(requirements=[1]),
      "requirements contains a non-string id"),
     ("a repeated requirement id",
-     with_checks(requirements=["AISEC-DEMO-001", "AISEC-DEMO-001"]),
+     with_checks(requirements=["AISCB-DEMO-001", "AISCB-DEMO-001"]),
      "duplicate requirement id"),
-    ("an unknown requirement id", with_checks(requirements=["AISEC-GONE-001"]),
+    ("an unknown requirement id", with_checks(requirements=["AISCB-GONE-001"]),
      "unknown requirement id"),
     ("a regex block that is not a list", with_checks(reply_required_regex={}),
      "reply_required_regex must be a list"),
@@ -665,18 +665,18 @@ baseline_guard("has no valid requirement id",
                "## Rules\n\n- **A rule without an id:** text.\n",
                "load_baseline_groups reports a rule bullet without an id")
 baseline_guard("malformed requirement id",
-               "## Rules\n\n- **[AISEC-demo-1] Rule:** text.\n",
+               "## Rules\n\n- **[AISCB-demo-1] Rule:** text.\n",
                "load_baseline_groups reports a malformed id")
 baseline_guard("duplicate requirement id",
-               "## Rules\n\n- **[AISEC-DEMO-001] One:** a.\n"
-               "- **[AISEC-DEMO-001] Two:** b.\n",
+               "## Rules\n\n- **[AISCB-DEMO-001] One:** a.\n"
+               "- **[AISCB-DEMO-001] Two:** b.\n",
                "load_baseline_groups reports a duplicate id")
 baseline_guard("is not on a rule-group bullet",
-               "## Rules\n\nSee [AISEC-DEMO-001] elsewhere.\n",
+               "## Rules\n\nSee [AISCB-DEMO-001] elsewhere.\n",
                "load_baseline_groups reports an id outside a rule bullet")
 baseline_guard("has no requirement ids", "## Rules\n\nNothing here.\n",
                "load_baseline_groups reports a baseline without ids")
-baseline_guard(None, "## Rules\n\n- **[AISEC-DEMO-001] One:** a.\n",
+baseline_guard(None, "## Rules\n\n- **[AISCB-DEMO-001] One:** a.\n",
                "load_baseline_groups on a valid baseline")
 
 
@@ -693,23 +693,23 @@ def identifier_guard(expected: str | None, baseline: str, readme: str | None,
     guard(expected, run)
 
 
-GOOD_BASELINE = "`baseline-id: aisec-0.1.0`\n"
-GOOD_README = ("Ask `baseline?`. The answer should include `aisec-0.1.0`.\n\n"
-               "- `aisec-0.1.0`: this baseline.\n")
+GOOD_BASELINE = "`baseline-id: aiscb-0.1.0`\n"
+GOOD_README = ("Ask `baseline?`. The answer should include `aiscb-0.1.0`.\n\n"
+               "- `aiscb-0.1.0`: this baseline.\n")
 
 identifier_guard("exactly one baseline id",
                  GOOD_BASELINE + GOOD_BASELINE, GOOD_README,
                  "check_baseline_identifier reports two baseline ids")
 identifier_guard("does not use Semantic Versioning",
-                 "`baseline-id: aisec-0.1`\n", GOOD_README,
+                 "`baseline-id: aiscb-0.1`\n", GOOD_README,
                  "check_baseline_identifier reports a non-SemVer id")
 identifier_guard("README missing at", GOOD_BASELINE, None,
                  "check_baseline_identifier reports a missing README")
 identifier_guard("must document exactly one", GOOD_BASELINE,
-                 "- `aisec-0.1.0`: this baseline.\n",
+                 "- `aiscb-0.1.0`: this baseline.\n",
                  "check_baseline_identifier reports an undocumented verification id")
 identifier_guard("does not match", GOOD_BASELINE,
-                 GOOD_README.replace("- `aisec-0.1.0`", "- `aisec-0.2.0`"),
+                 GOOD_README.replace("- `aiscb-0.1.0`", "- `aiscb-0.2.0`"),
                  "check_baseline_identifier reports a stale README id")
 identifier_guard(None, GOOD_BASELINE, GOOD_README,
                  "check_baseline_identifier on matching files")
@@ -762,17 +762,17 @@ def catalog_guard(expected: str | None, catalog: str | None, label: str,
         with paths(INDEX=index):
             selfcheck.check_requirement_catalog(
                 groups if groups is not None
-                else {"AISEC-DEMO-001": ("First rule", "Non-negotiable")}
+                else {"AISCB-DEMO-001": ("First rule", "Non-negotiable")}
             )
         return label
     guard(expected, run)
 
 
 ENTRY = """\
-## AISEC-DEMO-001 — First rule
+## AISCB-DEMO-001 — First rule
 
 **Section:** Non-negotiable
-**Normative source:** `secure-coding-baseline.md`, rule group `AISEC-DEMO-001`.
+**Normative source:** `secure-coding-baseline.md`, rule group `AISCB-DEMO-001`.
 **Applies when:** The demo runs.
 **Requirement:** Do the safe thing.
 **Observable acceptance:** The result is safe.
@@ -786,10 +786,10 @@ catalog_guard("malformed requirement heading", "## Not a requirement\n",
               "catalog_entries reports a malformed heading")
 catalog_guard("repeats field", ENTRY + "**Section:** Non-negotiable\n",
               "catalog_entries reports a repeated field")
-catalog_guard("lists 'AISEC-DEMO-001' twice", ENTRY + ENTRY,
+catalog_guard("lists 'AISCB-DEMO-001' twice", ENTRY + ENTRY,
               "check_requirement_catalog reports a duplicate entry")
 catalog_guard("which the baseline does not define",
-              ENTRY.replace("AISEC-DEMO-001", "AISEC-GONE-001"),
+              ENTRY.replace("AISCB-DEMO-001", "AISCB-GONE-001"),
               "check_requirement_catalog reports an unknown requirement",
               groups={})
 catalog_guard("baseline calls it", ENTRY.replace("— First rule", "— Other name"),
@@ -802,7 +802,7 @@ catalog_guard("baseline has it in", ENTRY.replace("**Section:** Non-negotiable",
                                                   "**Section:** Apply"),
               "check_requirement_catalog reports a wrong section")
 catalog_guard("does not name its baseline rule group",
-              ENTRY.replace("`secure-coding-baseline.md`, rule group `AISEC-DEMO-001`.",
+              ENTRY.replace("`secure-coding-baseline.md`, rule group `AISCB-DEMO-001`.",
                             "somewhere else."),
               "check_requirement_catalog reports an unsourced entry")
 catalog_guard("must be 'None.'", ENTRY.replace("**Model cases:** None.",
@@ -811,11 +811,11 @@ catalog_guard("must be 'None.'", ENTRY.replace("**Model cases:** None.",
 catalog_guard("must start with 'Partial.'",
               ENTRY.replace("**Model cases:** None.", "**Model cases:** `a-case`"),
               "check_requirement_catalog reports the wrong evidence level",
-              case_coverage={"AISEC-DEMO-001": ["a-case"]})
-catalog_guard("catalog does not list 'AISEC-DEMO-002'", ENTRY,
+              case_coverage={"AISCB-DEMO-001": ["a-case"]})
+catalog_guard("catalog does not list 'AISCB-DEMO-002'", ENTRY,
               "check_requirement_catalog reports an unlisted rule group",
-              groups={"AISEC-DEMO-001": ("First rule", "Non-negotiable"),
-                      "AISEC-DEMO-002": ("Second rule", "Non-negotiable")})
+              groups={"AISCB-DEMO-001": ("First rule", "Non-negotiable"),
+                      "AISCB-DEMO-002": ("Second rule", "Non-negotiable")})
 catalog_guard(None, ENTRY, "check_requirement_catalog on a matching catalog")
 
 

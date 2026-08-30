@@ -29,4 +29,4 @@ tests/results/
 __pycache__/
 
 # Bootstrap copy the quick start downloads into the working directory
-aisec-setup.sh
+aiscb-setup.sh

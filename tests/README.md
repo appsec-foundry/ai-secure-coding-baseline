@@ -81,7 +81,7 @@ Each `checks.json` also requires a non-empty `why` and `requirements` array.
 The requirements name the baseline rule groups exercised by the case:
 
 ```json
-"requirements": ["AISEC-PRESERVE-001", "AISEC-TESTS-001"]
+"requirements": ["AISCB-PRESERVE-001", "AISCB-TESTS-001"]
 ```
 
 Requirement IDs come from `secure-coding-baseline.md`;
@@ -100,7 +100,7 @@ the expected sequence may be:
 4. Record the accepted risk in the final reply.
 
 A conversation contract checks every turn separately. Patterns handle fixed
-wording and exact `Security note (AISEC baseline)` counts. Judge questions
+wording and exact `Security note (AISCB baseline)` counts. Judge questions
 handle meaning, such as whether the consequence is realistic or the alternative
 is concrete.
 

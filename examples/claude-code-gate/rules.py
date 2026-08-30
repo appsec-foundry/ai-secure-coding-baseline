@@ -21,7 +21,7 @@ def _compile(pattern: str, *, ignore_case: bool = False) -> re.Pattern[str]:
 
 RULES: tuple[Rule, ...] = (
     Rule(
-        rule_id="AISEC-PRESERVE-001",
+        rule_id="AISCB-PRESERVE-001",
         title="TLS certificate verification disabled",
         pattern=_compile(
             r"""
@@ -40,7 +40,7 @@ RULES: tuple[Rule, ...] = (
         ),
     ),
     Rule(
-        rule_id="AISEC-PRESERVE-001",
+        rule_id="AISCB-PRESERVE-001",
         title="Authentication, authorization, or CSRF behind an off switch",
         pattern=_compile(
             r"""

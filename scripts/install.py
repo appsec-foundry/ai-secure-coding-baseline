@@ -45,6 +45,8 @@ KNOWN_HOOK_DIGESTS = (
     "b43737769f40c85ff056e6e237b7b3035a1617eddf9a4269b92c8bd8ba78b182",
     "3e0961143718b21cc16317ef63a5ce6d4a34dcf91bda7ad6577f160e4927f89d",
 )
+# Installed file names are installation state, not identity: renaming one
+# leaves an existing installation with an orphaned hook beside the new one.
 COPILOT_VERSION_HOOK_NAME = "aisec-baseline-version.json"
 TOOLS = ("claude", "codex", "copilot")
 TOOL_LABELS = {
@@ -53,7 +55,7 @@ TOOL_LABELS = {
     "copilot": "GitHub Copilot",
 }
 
-OFFICIAL_NAME = "aisec"
+OFFICIAL_NAME = "aiscb"
 GITHUB_REPOSITORY = "appsec-foundry/aiscb"
 LATEST_RELEASE_URL = (
     f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
@@ -1174,7 +1176,7 @@ def _backup_path(path: Path) -> Path:
 
 
 def _atomic_symlink(target: Path, source: Path) -> None:
-    temporary = target.with_name(f".{target.name}.aisec-{secrets.token_hex(8)}")
+    temporary = target.with_name(f".{target.name}.aiscb-{secrets.token_hex(8)}")
     try:
         temporary.symlink_to(str(source))
         os.replace(temporary, target)

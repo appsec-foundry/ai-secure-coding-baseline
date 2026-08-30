@@ -254,7 +254,7 @@ bundled = install.bundled_baseline()
 check("the checkout installer uses the canonical upstream",
       install.GITHUB_REPOSITORY == "appsec-foundry/aiscb")
 new_content = bundled.content.replace(
-    bundled.baseline_id.encode(), b"aisec-9.8.7", 1
+    bundled.baseline_id.encode(), b"aiscb-9.8.7", 1
 )
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -264,7 +264,7 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     old_content = bundled.content.replace(
-        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+        bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )
     install.install(["codex"], project, None, content=bundled.content)
     install.install(["codex"], home, home, content=old_content)
@@ -329,7 +329,7 @@ check("the updater rejects cross-host redirects", redirect_rejected)
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
     old_content = bundled.content.replace(
-        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+        bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )
     install.install(["codex"], root, None, content=old_content)
     first = install.scan_project(root, {})
@@ -348,7 +348,7 @@ with tempfile.TemporaryDirectory() as tmp:
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
     old_content = bundled.content.replace(
-        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+        bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )
     install.install(["codex"], root, None, content=old_content)
     first = install.scan_project(root, {})
@@ -534,7 +534,7 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     old_content = bundled.content.replace(
-        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+        bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )
     install.install(["codex"], home, home, content=old_content)
     previous = [item for item in install.scan_user(home, {}) if item.kind == "user"][0]
@@ -607,7 +607,7 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     old_content = bundled.content.replace(
-        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+        bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )
     install.install(["codex"], project, None, content=old_content)
     previous = install.scan_project(project, {})
@@ -649,7 +649,7 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     old_content = bundled.content.replace(
-        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+        bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )
     install.install(["codex"], home, home, content=old_content)
     previous = [item for item in install.scan_user(home, {}) if item.kind == "user"][0]
@@ -696,7 +696,7 @@ with tempfile.TemporaryDirectory() as tmp:
     current.mkdir()
     project.mkdir()
     old_content = bundled.content.replace(
-        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+        bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )
     install.install(["codex"], home, home, content=old_content)
     install.install(["codex"], project, None, content=old_content)
@@ -744,7 +744,7 @@ with tempfile.TemporaryDirectory() as tmp:
     current.mkdir()
     target.mkdir()
     old_content = bundled.content.replace(
-        bundled.baseline_id.encode(), b"aisec-0.0.1", 1
+        bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )
     (target / install.BASELINE).write_bytes(old_content)
     answers = iter(["", "y", "2", "2", "n"])
@@ -778,7 +778,7 @@ readme = (install.REPO / "README.md").read_text(encoding="utf-8")
 quick_start = readme.split("## Quick start", 1)[1].split("\n## ", 1)[0]
 normalized_quick_start = " ".join(quick_start.split())
 check("the quick start pins the exact remote bootstrap content",
-      f"echo '{setup_digest} aisec-setup.sh' | sha256sum --check"
+      f"echo '{setup_digest} aiscb-setup.sh' | sha256sum --check"
       in normalized_quick_start)
 completed = subprocess.run(
     ["bash", str(setup_script), "--help"],
@@ -815,10 +815,10 @@ with tempfile.TemporaryDirectory() as tmp:
         "done\n"
         "case \"$url\" in\n"
         "  */branches/main)\n"
-        "    printf '{\"commit\":{\"sha\":\"%s\"}}\\n' \"$AISEC_TEST_REF\" ;;\n"
-        "  */\"$AISEC_TEST_REF\"/*)\n"
-        "    path=${url#*\"$AISEC_TEST_REF\"/}\n"
-        "    cp \"$AISEC_TEST_REPO/$path\" \"$output\" ;;\n"
+        "    printf '{\"commit\":{\"sha\":\"%s\"}}\\n' \"$AISCB_TEST_REF\" ;;\n"
+        "  */\"$AISCB_TEST_REF\"/*)\n"
+        "    path=${url#*\"$AISCB_TEST_REF\"/}\n"
+        "    cp \"$AISCB_TEST_REPO/$path\" \"$output\" ;;\n"
         "  *)\n"
         "    echo \"unexpected URL: $url\" >&2; exit 1 ;;\n"
         "esac\n",
@@ -827,8 +827,8 @@ with tempfile.TemporaryDirectory() as tmp:
     mock_curl.chmod(0o755)
     environment = os.environ.copy()
     environment["PATH"] = f"{mock_bin}{os.pathsep}{environment['PATH']}"
-    environment["AISEC_TEST_REF"] = "a" * 40
-    environment["AISEC_TEST_REPO"] = str(install.REPO)
+    environment["AISCB_TEST_REF"] = "a" * 40
+    environment["AISCB_TEST_REPO"] = str(install.REPO)
     remote = subprocess.run(
         ["sh", str(remote_setup), "--help"],
         capture_output=True,
@@ -954,7 +954,7 @@ BAD_RELEASES = [
      release_feed({"tag_name": "v9.8.7"},
                   {"type": "file", "encoding": "base64",
                    "content": base64.b64encode(
-                       b"# Something else\n\n`baseline-id: aisec-9.8.7`\n").decode()})),
+                       b"# Something else\n\n`baseline-id: aiscb-9.8.7`\n").decode()})),
 ]
 for label, feed in BAD_RELEASES:
     check(f"the updater rejects {label}",
@@ -994,7 +994,7 @@ for label, error in (("a server error", FakeHTTPError(500)),
 
 
 def newer_release(*_args, **_kwargs):
-    older = bundled.content.replace(bundled.baseline_id.encode(), b"aisec-0.0.1", 1)
+    older = bundled.content.replace(bundled.baseline_id.encode(), b"aiscb-0.0.1", 1)
     return install.parse_baseline(older, "test release")
 
 
@@ -1261,7 +1261,7 @@ with tempfile.TemporaryDirectory() as tmp:
 # --- update refusals -------------------------------------------------------
 
 customized = install.parse_baseline(
-    bundled.content.replace(b"`baseline-id: aisec-", b"`baseline-id: acme-", 1),
+    bundled.content.replace(b"`baseline-id: aiscb-", b"`baseline-id: acme-", 1),
     "custom",
 )
 custom_installation = install.Installation(
