@@ -1210,6 +1210,178 @@ def record_installation(
         registry["user"] = entry
 
 
+def _remove_import_line(target: Path, source: Path, report: list[str]) -> None:
+    """Take out the line that names our baseline, never the file around it."""
+    if target.is_symlink() or not target.is_file():
+        return
+    try:
+        content = read_limited(target, MAX_INSTRUCTION_BYTES).decode("utf-8")
+    except (OSError, UnicodeDecodeError, ValueError):
+        report.append(f"blocked {target}: cannot safely read the instruction file")
+        return
+    line = f"@{source}"
+    lines = content.splitlines()
+    if line not in lines:
+        return
+    kept = [item for item in lines if item != line]
+    if not any(item.strip() for item in kept):
+        target.unlink()
+        report.append(f"removed {target}")
+        return
+    trailing = "\n" if content.endswith("\n") else ""
+    _atomic_replace(target, ("\n".join(kept) + trailing).encode())
+    report.append(f"updated {target}: dropped the import line")
+
+
+def _remove_merged_version_hook(
+    path: Path, event: str, entry: dict[str, object], report: list[str]
+) -> None:
+    try:
+        config, existed = _read_hook_config(path)
+        if not existed:
+            return
+        hooks = config.get("hooks")
+        entries = hooks.get(event) if isinstance(hooks, dict) else None
+        if not isinstance(entries, list):
+            return
+        kept = [item for item in entries if not _is_moved_version_hook(item, entry)]
+        if len(kept) == len(entries):
+            return
+        if kept:
+            hooks[event] = kept
+        else:
+            del hooks[event]
+            if not hooks:
+                del config["hooks"]
+        if config:
+            _write_hook_config(path, config, True)
+            report.append(f"updated {path}: dropped the startup hook")
+        else:
+            path.unlink()
+            report.append(f"removed {path}")
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+        report.append(f"blocked {path}: cannot safely remove the startup hook")
+
+
+def _remove_copilot_version_hook(
+    path: Path, config: dict[str, object], report: list[str]
+) -> None:
+    try:
+        current, existed = _read_hook_config(path)
+        if not existed:
+            return
+        if not _is_moved_version_hook(current, config):
+            report.append(f"blocked {path}: contains a different hook configuration")
+            return
+        path.unlink()
+        report.append(f"removed {path}")
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+        report.append(f"blocked {path}: cannot safely remove the startup hook")
+
+
+def _remove_version_hooks(root: Path, home: Path | None, report: list[str]) -> None:
+    helper = version_hook_path(root, home)
+    project = home is None
+    for tool in TOOLS:
+        if tool == "claude":
+            path = (root / ".claude" / "settings.json") if project else (
+                home / ".claude" / "settings.json"
+            )
+            _remove_merged_version_hook(
+                path, "SessionStart", _claude_version_hook(helper, project), report
+            )
+        elif tool == "codex":
+            path = (root / ".codex" / "hooks.json") if project else (
+                home / ".codex" / "hooks.json"
+            )
+            _remove_merged_version_hook(
+                path, "SessionStart", _codex_version_hook(helper, project), report
+            )
+        else:
+            path = (
+                root / ".github" / "hooks" / COPILOT_VERSION_HOOK_NAME
+                if project
+                else home / ".copilot" / "hooks" / COPILOT_VERSION_HOOK_NAME
+            )
+            _remove_copilot_version_hook(
+                path, _copilot_version_config(helper, project), report
+            )
+    if helper.is_symlink() or not helper.is_file():
+        return
+    try:
+        digest = hashlib.sha256(read_limited(helper, MAX_BASELINE_BYTES)).hexdigest()
+    except (OSError, ValueError):
+        report.append(f"blocked {helper}: cannot safely read the hook helper")
+        return
+    if digest not in KNOWN_HOOK_DIGESTS:
+        report.append(f"blocked {helper}: contains different hook helper code")
+        return
+    helper.unlink()
+    report.append(f"removed {helper}")
+
+
+def _managed_source(installation: Installation) -> bool:
+    """Whether the baseline file itself was placed here by this installer."""
+    if installation.kind == "user":
+        return installation.source.resolve(strict=False) == user_source(
+            installation.root
+        ).resolve(strict=False)
+    if installation.kind == "project":
+        return installation.source.resolve(strict=False) == (
+            installation.root / BASELINE
+        ).resolve(strict=False)
+    return False
+
+
+def remove_installation(installation: Installation, report: list[str]) -> bool:
+    """Take back what this installer put in place, and nothing else."""
+    if installation.kind == "unmanaged":
+        report.append(
+            f"skipped {installation.label}: this file was not placed by the installer"
+        )
+        return False
+    project = installation.kind == "project"
+    root = installation.root
+    home = None if project else installation.root
+    targets = project_targets(root) if project else user_targets(root)
+    for actions in targets.values():
+        for kind, target in actions:
+            if kind == "link":
+                if _link_points_to(target, installation.source):
+                    target.unlink()
+                    report.append(f"removed {target}")
+            else:
+                _remove_import_line(target, installation.source, report)
+    _remove_version_hooks(root, home, report)
+    if _managed_source(installation):
+        installation.source.unlink()
+        report.append(f"removed {installation.source}")
+    if not project:
+        data = user_data_root(root)
+        installer = data / INSTALLER_NAME
+        if installer.is_file() and not installer.is_symlink():
+            installer.unlink()
+            report.append(f"removed {installer}")
+        if data.is_dir() and not any(data.iterdir()):
+            data.rmdir()
+    else:
+        hook_dir = root / VERSION_HOOK_DIR
+        if hook_dir.is_dir() and not any(hook_dir.iterdir()):
+            hook_dir.rmdir()
+    return True
+
+
+def forget_installation(
+    registry: dict[str, object], installation: Installation
+) -> None:
+    if installation.kind == "project":
+        projects = registry.get("projects")
+        if isinstance(projects, dict):
+            projects.pop(str(installation.root.resolve()), None)
+    elif installation.kind in {"user", "legacy-user"}:
+        registry["user"] = None
+
+
 def _backup_path(path: Path) -> Path:
     candidate = path.with_name(f"{path.name}.bak")
     for number in range(1, 101):
@@ -1765,6 +1937,64 @@ def _offer_update_check(
     registry[UPDATE_CHECK_KEY] = {**section, "enabled": enabled}
 
 
+def _remove_interactively(
+    registry: dict[str, object],
+    installations: list[Installation],
+    input_fn: Callable[[str], str],
+    output: Callable[[str], None],
+) -> bool:
+    """Remove whole installations the user picks, one, several, or all."""
+    output("\nRemove which installation?")
+    for number, item in enumerate(installations, 1):
+        output(f"  {number}. {item.label}  {item.baseline.baseline_id}")
+    chosen: list[Installation] = []
+    for _ in range(3):
+        answer = _read_answer(
+            input_fn,
+            "Installations (comma-separated; all = all; Enter = cancel): ",
+        )
+        if not answer:
+            output("Nothing removed.")
+            return False
+        if answer.lower() == "all":
+            chosen = list(installations)
+            break
+        picked: list[Installation] = []
+        valid = True
+        for part in re.split(r"[\s,]+", answer):
+            if part.isdigit() and 1 <= int(part) <= len(installations):
+                item = installations[int(part) - 1]
+                if item not in picked:
+                    picked.append(item)
+            else:
+                valid = False
+                break
+        if valid and picked:
+            chosen = picked
+            break
+        output("Invalid selection. Use the numbers shown, or all.")
+    if not chosen:
+        output("Nothing removed.")
+        return False
+
+    output("\nThis removes the links, instruction lines, hooks and files it placed for:")
+    for item in chosen:
+        output(f"  {item.label}")
+    if not ask_yes_no(input_fn, "Remove them?", False, output):
+        output("Nothing removed.")
+        return False
+
+    removed = False
+    for item in chosen:
+        report: list[str] = []
+        if remove_installation(item, report):
+            forget_installation(registry, item)
+            removed = True
+        for line in report:
+            output(f"  {line}")
+    return removed
+
+
 def _verify_baseline_tools(
     selected_tools: list[str],
     installed: Installation | None,
@@ -2030,17 +2260,20 @@ def interactive_setup(
         "change tools in project" if current_installed else "install in project"
     )
     user_action = "change tools for user" if user_installed else "install for user"
-    output("\nWhat would you like to do?")
-    output(f"  1. {user_action}")
+    actions = [(user_action, "user")]
     if project_root is not None:
-        output(f"  2. {current_action} {display_path(project_root)}")
-        output("  3. exit")
-        valid_choices = {"1", "2", "3"}
-        exit_choice = "3"
-    else:
-        output("  2. exit")
-        valid_choices = {"1", "2"}
-        exit_choice = "2"
+        actions.append(
+            (f"{current_action} {display_path(project_root)}", "project")
+        )
+    removable = [item for item in installations if item.kind != "unmanaged"]
+    if removable:
+        actions.append(("remove an installation", "remove"))
+    actions.append(("exit", "exit"))
+    output("\nWhat would you like to do?")
+    for number, (label, _key) in enumerate(actions, 1):
+        output(f"  {number}. {label}")
+    valid_choices = {str(number) for number in range(1, len(actions) + 1)}
+    exit_choice = str(len(actions))
     # Offer the user-wide install while it is missing, and the exit once it is
     # there. Pressing Enter must never write into whatever directory this runs in.
     default_choice = exit_choice if user_installed else "1"
@@ -2056,11 +2289,12 @@ def interactive_setup(
 
     action_changed = False
     action_incomplete = False
-    if choice == "1":
+    chosen = actions[int(choice) - 1][1]
+    if chosen == "user":
         action_changed, action_incomplete = _install_user_interactively(
             home, registry, available, reviewed_updates, input_fn, output
         )
-    elif choice == "2" and project_root is not None:
+    elif chosen == "project" and project_root is not None:
         action_changed, action_incomplete = _install_project_interactively(
             home,
             registry,
@@ -2069,6 +2303,10 @@ def interactive_setup(
             input_fn,
             output,
             project_root,
+        )
+    elif chosen == "remove":
+        action_changed = _remove_interactively(
+            registry, removable, input_fn, output
         )
 
     if action_changed:
@@ -2110,6 +2348,51 @@ def installation_status(
     installations = discover_installations(home, registry, current_root)
     _show_setup_status(output, installations, available, home, current_root)
     return 0
+
+
+def uninstall(
+    *,
+    home: Path,
+    root: Path,
+    user: bool,
+    output: Callable[[str], None] = print,
+    state_path: Path | None = None,
+) -> int:
+    """Remove one scope without asking; the guided setup offers a choice."""
+    state_path = state_path or registry_path(home)
+    registry, writable, note = load_registry(state_path)
+    if note:
+        output(note)
+    if user:
+        found = [item for item in scan_user(home, registry.get("user")) if item.kind
+                 in {"user", "legacy-user"}]
+    else:
+        projects = registry.get("projects")
+        entry = projects.get(str(root.resolve())) if isinstance(projects, dict) else None
+        item = scan_project(root, entry if isinstance(entry, dict) else {})
+        found = [item] if item else []
+    if not found:
+        output("Nothing installed here.")
+        return 1
+    removed = False
+    for item in found:
+        report: list[str] = []
+        if remove_installation(item, report):
+            forget_installation(registry, item)
+            removed = True
+        for line in report:
+            output(line)
+    if removed and writable:
+        projects = registry.get("projects")
+        empty = registry.get("user") is None and not (
+            projects if isinstance(projects, dict) else {}
+        )
+        if empty and state_path.is_file() and not state_path.is_symlink():
+            state_path.unlink()
+            output(f"removed {state_path}")
+        else:
+            save_registry(state_path, registry)
+    return 0 if removed else 1
 
 
 def _register_noninteractive(
@@ -2154,14 +2437,25 @@ def main(argv: list[str] | None = None) -> int:
         help="skip the release check during setup or status",
     )
     parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="remove what this installer placed for a project or, with --user, this user",
+    )
+    parser.add_argument(
         "--refresh-update-cache",
         action="store_true",
         help="look up the published release for the startup hook, if setup allowed it",
     )
     args = parser.parse_args(argv)
 
+    if args.uninstall:
+        if args.tools or args.status or args.interactive or args.offline:
+            parser.error("--uninstall takes only --user or --into")
+        return uninstall(home=Path.home(), root=args.into, user=args.user)
+
     if args.refresh_update_cache:
-        if args.tools or args.user or args.status or args.interactive or args.offline:
+        if (args.tools or args.user or args.status or args.interactive
+                or args.offline or args.uninstall):
             parser.error("--refresh-update-cache takes no other arguments")
         return refresh_update_cache(home=Path.home())
 

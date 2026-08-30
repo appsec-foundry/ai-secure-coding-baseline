@@ -240,13 +240,19 @@ make install                           # all supported tools in this project
 make install-claude                    # one tool only
 make install ARGS=--user               # user-level install
 make install ARGS="--into <path>"      # another project
+make uninstall                         # remove what the installer placed here
+make uninstall ARGS=--user             # remove the user-level installation
 ```
 
 `install-codex` and `install-copilot` mirror `install-claude`. Use the manual
 steps below for existing instruction files and organization-wide setup.
 
 The guided flow installs or updates selected tools at user level by default, or
-in the current project, and verifies each integration. Projects support Claude
+in the current project, and verifies each integration. It also offers to remove
+installations again, one, several, or all of them; removal takes back only what
+the installer placed: links that point at the managed baseline, the import line
+that names it, startup hook entries it wrote, and the files in its own
+directory. Anything else is reported and left alone. Projects support Claude
 Code, Codex, and GitHub Copilot; user installs support Claude Code, Codex, and
 Copilot CLI. Existing instruction files and unrelated symlinks are preserved.
 

@@ -610,14 +610,14 @@ with tempfile.TemporaryDirectory() as tmp:
     prompts = []
     install.interactive_setup(
         home=home,
-        input_fn=lambda prompt: prompts.append(prompt) or "3",
+        input_fn=lambda prompt: prompts.append(prompt) or "",
         output=lambda _line: None,
         check_online=False,
         state_path=state,
         current_root=project,
     )
     check("a complete user scope defaults to leaving, not to writing a project",
-          prompts == ["Choice [3]: "], str(prompts))
+          prompts == ["Choice [4]: "], str(prompts))
 
 with tempfile.TemporaryDirectory() as tmp:
     sandbox = Path(tmp)
@@ -651,7 +651,7 @@ with tempfile.TemporaryDirectory() as tmp:
                   for line in output), str(output[:12]))
     check("a setup with nothing left to do defaults to leaving",
           result == 0
-          and prompts == ["Choice [3]: "]
+          and prompts == ["Choice [4]: "]
           and output[-1] == "No changes made.",
           f"prompts={prompts!r}, last={output[-1]!r}")
 
@@ -683,7 +683,7 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check("an update runs first, and the user scope keeps its tools",
           result == 0
-          and any(prompt == "Choice [3]: " for prompt in prompts)
+          and any(prompt == "Choice [4]: " for prompt in prompts)
           and any("keep installed (Codex)" in prompt for prompt in prompts)
           and (home / ".codex" / "AGENTS.md").is_symlink()
           and not (home / ".claude" / "rules").exists()
@@ -842,7 +842,7 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     state = sandbox / "state.json"
     install.save_registry(state, registry)
-    answers = iter(["n", "3"])
+    answers = iter(["n", ""])
     prompts = []
 
     def decline_separate_updates(prompt: str) -> str:
@@ -1322,6 +1322,65 @@ with tempfile.TemporaryDirectory() as tmp:
           any("is a symlink" in line and install.INSTALLER_NAME in line
               for line in report), str(report))
 
+# --- taking an installation back out ---------------------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    install.install(list(install.TOOLS), home, home)
+    install.install_version_hooks(list(install.TOOLS), home, home)
+    instructions = home / ".claude" / "CLAUDE.md"
+    instructions.write_text(
+        instructions.read_text(encoding="utf-8") + "my own line\n", encoding="utf-8"
+    )
+    settings = home / ".claude" / "settings.json"
+    config = json.loads(settings.read_text(encoding="utf-8"))
+    config["permissions"] = {"ask": ["Edit(/specs/**)"]}
+    settings.write_text(json.dumps(config), encoding="utf-8")
+    item = [i for i in install.scan_user(home, {}) if i.kind == "user"][0]
+    report = []
+    removed = install.remove_installation(item, report)
+    leftovers = sorted(
+        str(path.relative_to(home))
+        for path in home.rglob("*")
+        if path.is_file() or path.is_symlink()
+    )
+    check("removing an installation takes back every place it wrote",
+          removed and leftovers == [".claude/CLAUDE.md", ".claude/settings.json"],
+          f"{leftovers} / {report}")
+    check("what the user wrote themselves stays",
+          instructions.read_text(encoding="utf-8") == "my own line\n"
+          and json.loads(settings.read_text(encoding="utf-8"))
+              == {"permissions": {"ask": ["Edit(/specs/**)"]}},
+          instructions.read_text(encoding="utf-8"))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    install.install(["claude"], home, home)
+    source = install.user_source(home)
+    foreign = home / ".codex" / "AGENTS.md"
+    foreign.parent.mkdir(parents=True, exist_ok=True)
+    foreign.symlink_to(home / "somewhere-else.md")
+    item = [i for i in install.scan_user(home, {}) if i.kind == "user"][0]
+    report = []
+    install.remove_installation(item, report)
+    check("a link that points somewhere else is left alone",
+          foreign.is_symlink()
+          and foreign.readlink() == home / "somewhere-else.md"
+          and not source.exists(), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    manual = home / ".codex" / "AGENTS.md"
+    manual.parent.mkdir(parents=True)
+    manual.write_bytes(bundled.content)
+    item = install.scan_user(home)[0]
+    report = []
+    removed = install.remove_installation(item, report)
+    check("a file the installer never placed is reported, not deleted",
+          not removed and manual.is_file()
+          and any("not placed by the installer" in line for line in report),
+          str(report))
+
 # --- import rewriting ------------------------------------------------------
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -1478,6 +1537,7 @@ REJECTED_ARGUMENTS = [
     ("--into on the filesystem root", ["codex", "--into", "/"]),
     ("--refresh-update-cache with another mode",
      ["--refresh-update-cache", "--status"]),
+    ("--uninstall with tools", ["--uninstall", "codex"]),
 ]
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -1495,6 +1555,17 @@ with tempfile.TemporaryDirectory() as tmp:
     completed = cli(["codex", "--into", str(sandbox / "absent")], home)
     check("the command line refuses a missing project directory",
           completed.returncode == 2, completed.stderr[:200])
+
+    cli(["--user"], home)
+    completed = cli(["--uninstall", "--user"], home)
+    check("the command line removes a user installation and says what it took",
+          completed.returncode == 0
+          and not install.user_source(home).exists()
+          and "removed" in completed.stdout, completed.stdout[:300])
+    completed = cli(["--uninstall", "--user"], home)
+    check("removing nothing is reported as such",
+          completed.returncode == 1 and "Nothing installed here." in completed.stdout,
+          completed.stdout[:200])
 
     completed = cli(["--interactive"], home)
     check("guided setup refuses to run without a terminal",

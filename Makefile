@@ -2,8 +2,8 @@
 # so the expensive targets run the free self-check before spending anything.
 
 .DEFAULT_GOAL := check
-.PHONY: check coverage setup update status install install-claude install-codex \
-        install-copilot dry-run test test-all clean-results help
+.PHONY: check coverage setup update status install uninstall install-claude \
+        install-codex install-copilot dry-run test test-all clean-results help
 
 # Both check and coverage run this suite, so it is listed once.
 CHECK_TESTS = tests/selfcheck.py \
@@ -33,6 +33,10 @@ update: setup
 ## status      show installed baseline status; ARGS=--offline skips release check
 status:
 	python3 scripts/install.py --status $(ARGS)
+
+## uninstall   remove what the installer placed; ARGS=--user for the user level
+uninstall:
+	python3 scripts/install.py --uninstall $(ARGS)
 
 ## install     link the baseline where every supported tool reads it
 ##             ARGS=--user installs for this machine instead of the project
