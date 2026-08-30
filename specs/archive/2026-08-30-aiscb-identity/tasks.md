@@ -20,5 +20,7 @@
       changed for a model to behave differently on, and the full matrix costs
       hours and real tokens. The deterministic checks cover that every case and
       catalog entry names a defined ID.
-- [ ] Publish a release carrying `aiscb-0.1.10`, without which the installer's
-      online check falls back to the bundled copy.
+- [x] Publish a release carrying `aiscb-0.1.10`, without which the installer's
+      online check falls back to the bundled copy. Tagged `aiscb-0.1.10`,
+      because the existing `v0.1.10` pointed at the state before the rename;
+      both tags now name the released commit.
