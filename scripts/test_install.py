@@ -240,6 +240,50 @@ with tempfile.TemporaryDirectory() as tmp:
           all(line.startswith("in place") for line in again), str(again))
 
 with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    install.install(list(install.TOOLS), home, home)
+    elsewhere = home / "previous-location" / install.VERSION_HOOK_NAME
+    elsewhere.parent.mkdir(parents=True)
+    elsewhere.write_bytes(install.VERSION_HOOK_SOURCE.read_bytes())
+    for path, maker in (
+        (home / ".claude" / "settings.json", install._claude_version_hook),
+        (home / ".codex" / "hooks.json", install._codex_version_hook),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(
+            {"hooks": {"SessionStart": [maker(elsewhere, False)]}}), encoding="utf-8")
+    copilot = home / ".copilot" / "hooks" / install.COPILOT_VERSION_HOOK_NAME
+    copilot.parent.mkdir(parents=True, exist_ok=True)
+    copilot.write_text(json.dumps(
+        install._copilot_version_config(elsewhere, False)), encoding="utf-8")
+    report = install.install_version_hooks(list(install.TOOLS), home, home)
+    entries = json.loads(
+        (home / ".claude" / "settings.json").read_text(encoding="utf-8")
+    )["hooks"]["SessionStart"]
+    check("a hook left behind by an earlier helper location is repointed",
+          all(install._version_hook_is_installed(tool, home, home)
+              for tool in install.TOOLS)
+          and len(entries) == 1
+          and sum(line.startswith("updated") for line in report) == 3, str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    install.install(["claude"], home, home)
+    hand_written = install._claude_version_hook(
+        install.version_hook_path(home, home), False
+    )
+    hand_written["hooks"][0]["args"][-1] = "message"
+    settings = home / ".claude" / "settings.json"
+    settings.write_text(json.dumps(
+        {"hooks": {"SessionStart": [hand_written]}}), encoding="utf-8")
+    report = install.install_version_hooks(["claude"], home, home)
+    check("a version hook of another shape is refused and says what to do",
+          any("blocked" in line and "remove it to let setup write" in line
+              for line in report)
+          and json.loads(settings.read_text(encoding="utf-8"))["hooks"]["SessionStart"]
+              == [hand_written], str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
     install.install(["claude"], root, None)
     settings = root / ".claude" / "settings.json"

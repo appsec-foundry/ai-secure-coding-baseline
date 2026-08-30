@@ -658,12 +658,32 @@ def _write_hook_config(path: Path, config: dict[str, object], existed: bool) -> 
         _write_new(path, payload)
 
 
+def _without_helper_path(value: object) -> object:
+    """Blank out the helper's location, so two entries compare by their shape."""
+    if isinstance(value, str):
+        return "<helper>" if VERSION_HOOK_NAME in value else value
+    if isinstance(value, list):
+        return [_without_helper_path(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _without_helper_path(item) for key, item in value.items()}
+    return value
+
+
+def _is_moved_version_hook(existing: object, entry: dict[str, object]) -> bool:
+    """An entry this installer wrote for a helper that has since moved."""
+    return (
+        VERSION_HOOK_NAME in json.dumps(existing, ensure_ascii=False)
+        and _without_helper_path(existing) == _without_helper_path(entry)
+    )
+
+
 def _install_merged_version_hook(
     path: Path,
     event: str,
     entry: dict[str, object],
     report: list[str],
 ) -> None:
+    moved: list[int] = []
     try:
         config, existed = _read_hook_config(path)
         hooks = config.setdefault("hooks", {})
@@ -675,13 +695,29 @@ def _install_merged_version_hook(
         if entry in entries:
             report.append(f"in place {path}")
             return
-        if VERSION_HOOK_NAME in json.dumps(entries, ensure_ascii=False):
-            report.append(f"blocked {path}: contains a different baseline version hook")
+        moved = [
+            index
+            for index, existing in enumerate(entries)
+            if _is_moved_version_hook(existing, entry)
+        ]
+        if VERSION_HOOK_NAME in json.dumps(entries, ensure_ascii=False) and not moved:
+            report.append(
+                f"blocked {path}: contains a different baseline version hook; "
+                "remove it to let setup write the current one"
+            )
             return
-        entries.append(entry)
+        if moved:
+            entries[moved[0]] = entry
+            for index in reversed(moved[1:]):
+                del entries[index]
+        else:
+            entries.append(entry)
         _write_hook_config(path, config, existed)
     except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
         report.append(f"blocked {path}: cannot safely merge the version hook")
+        return
+    if moved:
+        report.append(f"updated {path}: the hook now reads the current helper")
         return
     report.append(f"updated {path}" if existed else f"wrote {path}")
 
@@ -761,8 +797,15 @@ def _install_copilot_version_hook(
         if existed:
             if current == config:
                 report.append(f"in place {path}")
-            else:
-                report.append(f"blocked {path}: contains different hook configuration")
+                return
+            if not _is_moved_version_hook(current, config):
+                report.append(
+                    f"blocked {path}: contains different hook configuration; "
+                    "remove it to let setup write the current one"
+                )
+                return
+            _write_hook_config(path, config, True)
+            report.append(f"updated {path}: the hook now reads the current helper")
             return
         _write_hook_config(path, config, False)
     except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
