@@ -27,7 +27,7 @@ REPO = Path(__file__).resolve().parent.parent
 HELPER = REPO / "scripts" / "show_baseline_version.py"
 BASELINE = "secure-coding-baseline.md"
 MAX_BASELINE_BYTES = 256 * 1024
-REGISTRY_FILE = ".config/ai-secure-coding-baseline/installations.json"
+REGISTRY_FILE = ".config/aiscb/installations.json"
 
 sys.path.insert(0, str(HELPER.parent))
 import show_baseline_version as hook  # noqa: E402

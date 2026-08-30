@@ -11,8 +11,8 @@ from pathlib import Path
 
 BASELINE = "secure-coding-baseline.md"
 INSTALLER = "install.py"
-REGISTRY = Path(".config") / "ai-secure-coding-baseline" / "installations.json"
-USER_DATA = Path(".local") / "share" / "ai-secure-coding-baseline"
+REGISTRY = Path(".config") / "aiscb" / "installations.json"
+USER_DATA = Path(".local") / "share" / "aiscb"
 MAX_BASELINE_BYTES = 256 * 1024
 MAX_REGISTRY_BYTES = 128 * 1024
 CHECK_INTERVAL = 24 * 60 * 60

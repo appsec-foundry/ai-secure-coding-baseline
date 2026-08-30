@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Callable
 
 BASELINE = "secure-coding-baseline.md"
-VERSION_HOOK_DIR = ".ai-secure-coding-baseline"
+VERSION_HOOK_DIR = ".aiscb"
 VERSION_HOOK_NAME = "show-baseline-version.py"
 INSTALLER_NAME = "install.py"
 INSTALLER_SOURCE = Path(__file__).resolve()
@@ -44,6 +44,7 @@ SOURCE = REPO / BASELINE
 KNOWN_HOOK_DIGESTS = (
     "b43737769f40c85ff056e6e237b7b3035a1617eddf9a4269b92c8bd8ba78b182",
     "3e0961143718b21cc16317ef63a5ce6d4a34dcf91bda7ad6577f160e4927f89d",
+    "9ab4a0107dec2cac076c75a0eedb0c768a18846b60a33851550544a656b249ba",
 )
 # Installed file names are installation state, not identity: renaming one
 # leaves an existing installation with an orphaned hook beside the new one.
@@ -355,7 +356,7 @@ def project_targets(root: Path) -> dict[str, list[tuple[str, Path]]]:
 
 
 def user_data_root(home: Path) -> Path:
-    return home / ".local" / "share" / "ai-secure-coding-baseline"
+    return home / ".local" / "share" / "aiscb"
 
 
 def user_source(home: Path) -> Path:
@@ -853,7 +854,7 @@ def _version_hook_is_installed(tool: str, root: Path, home: Path | None) -> bool
 
 
 def registry_path(home: Path) -> Path:
-    return home / ".config" / "ai-secure-coding-baseline" / "installations.json"
+    return home / ".config" / "aiscb" / "installations.json"
 
 
 def empty_registry() -> dict[str, object]:

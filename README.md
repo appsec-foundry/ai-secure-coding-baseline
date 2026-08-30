@@ -219,8 +219,8 @@ A user-level install keeps a runnable installer beside the managed baseline, so
 later checks and updates need neither a clone nor the remote bootstrap:
 
 ```bash
-python3 ~/.local/share/ai-secure-coding-baseline/install.py --status
-python3 ~/.local/share/ai-secure-coding-baseline/install.py --interactive
+python3 ~/.local/share/aiscb/install.py --status
+python3 ~/.local/share/aiscb/install.py --interactive
 ```
 
 That copy updates the baseline. Changes to the installer or the startup hook
