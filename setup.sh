@@ -22,7 +22,7 @@ command -v python3 >/dev/null 2>&1 || {
     exit 1
 }
 
-api_url="https://api.github.com/repos/appsec-foundry/ai-secure-coding-baseline/branches/main"
+api_url="https://api.github.com/repos/appsec-foundry/aiscb/branches/main"
 source_ref=$(
     curl --proto '=https' \
         --fail --silent --show-error --max-time 15 "$api_url" |
@@ -59,7 +59,7 @@ cleanup() {
 trap cleanup 0 1 2 3 15
 mkdir -p "$setup_tmp/scripts"
 
-source_root="https://raw.githubusercontent.com/appsec-foundry/ai-secure-coding-baseline/$source_ref"
+source_root="https://raw.githubusercontent.com/appsec-foundry/aiscb/$source_ref"
 download() {
     curl --proto '=https' \
         --fail --silent --show-error --max-time 30 \

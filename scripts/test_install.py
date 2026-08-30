@@ -252,7 +252,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
 bundled = install.bundled_baseline()
 check("the checkout installer uses the canonical upstream",
-      install.GITHUB_REPOSITORY == "appsec-foundry/ai-secure-coding-baseline")
+      install.GITHUB_REPOSITORY == "appsec-foundry/aiscb")
 new_content = bundled.content.replace(
     bundled.baseline_id.encode(), b"aisec-9.8.7", 1
 )

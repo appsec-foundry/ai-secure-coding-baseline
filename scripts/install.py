@@ -54,7 +54,7 @@ TOOL_LABELS = {
 }
 
 OFFICIAL_NAME = "aisec"
-GITHUB_REPOSITORY = "appsec-foundry/ai-secure-coding-baseline"
+GITHUB_REPOSITORY = "appsec-foundry/aiscb"
 LATEST_RELEASE_URL = (
     f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
 )
@@ -271,7 +271,7 @@ def _read_json_url(url: str) -> object:
         url,
         headers={
             "Accept": "application/vnd.github+json",
-            "User-Agent": "ai-secure-coding-baseline-setup",
+            "User-Agent": "aiscb-setup",
             "X-GitHub-Api-Version": API_VERSION,
         },
     )

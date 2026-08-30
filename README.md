@@ -1,7 +1,7 @@
 # AI Secure Coding Baseline
 
-[![Last commit](https://img.shields.io/github/last-commit/appsec-foundry/ai-secure-coding-baseline.svg)](https://github.com/appsec-foundry/ai-secure-coding-baseline/commits)
-[![codecov](https://codecov.io/gh/appsec-foundry/ai-secure-coding-baseline/graph/badge.svg)](https://codecov.io/gh/appsec-foundry/ai-secure-coding-baseline)
+[![Last commit](https://img.shields.io/github/last-commit/appsec-foundry/aiscb.svg)](https://github.com/appsec-foundry/aiscb/commits)
+[![codecov](https://codecov.io/gh/appsec-foundry/aiscb/graph/badge.svg)](https://codecov.io/gh/appsec-foundry/aiscb)
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-D97757?logo=anthropic&logoColor=white)](https://code.claude.com/)
 [![GitHub Copilot](https://img.shields.io/badge/GitHub%20Copilot-compatible-000000?logo=githubcopilot&logoColor=white)](https://github.com/features/copilot)
@@ -37,8 +37,8 @@ version of the setup script and verifies its SHA-256 before running it:
 curl --proto '=https' \
   --fail --silent --show-error \
   --output aisec-setup.sh \
-  https://raw.githubusercontent.com/appsec-foundry/ai-secure-coding-baseline/521500994cecb2c2bb2c6d8ab425ae58b9019386/setup.sh &&
-echo '0a47d6ebaef4b86867d1e75867213689863daf7e72da1ba2b97ddd54f7046441  aisec-setup.sh' |
+  https://raw.githubusercontent.com/appsec-foundry/aiscb/521500994cecb2c2bb2c6d8ab425ae58b9019386/setup.sh &&
+echo 'de9d285118f5d83cd9577e53412130fe299345b8bd6a8e8bf2976126a00a2203  aisec-setup.sh' |
   sha256sum --check &&
 bash aisec-setup.sh
 ```
