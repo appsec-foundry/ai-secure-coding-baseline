@@ -1,4 +1,4 @@
-# AI Secure Coding Baseline (aiscb)
+# AI Secure Coding Baseline
 
 [![Last commit](https://img.shields.io/github/last-commit/appsec-foundry/aiscb.svg)](https://github.com/appsec-foundry/aiscb/commits)
 [![codecov](https://codecov.io/gh/appsec-foundry/aiscb/graph/badge.svg)](https://codecov.io/gh/appsec-foundry/aiscb)
@@ -7,9 +7,7 @@
 [![GitHub Copilot](https://img.shields.io/badge/GitHub%20Copilot-compatible-000000?logo=githubcopilot&logoColor=white)](https://github.com/features/copilot)
 [![OpenAI Codex](https://img.shields.io/badge/OpenAI%20Codex-compatible-412991?logo=openai&logoColor=white)](https://developers.openai.com/codex/)
 
-A short set of secure-coding rules for AI coding assistants. Add it to a
-project's instructions so Claude Code, Copilot, Codex, and other agents can
-apply it when they write or change code.
+AISCB is a compact set of secure-coding rules for AI coding assistants. Add it to a project's instructions so Claude Code, Copilot, Codex, and other agents follow the rules when they write or change code.
 
 The [appsec-advisor](https://github.com/appsec-foundry/appsec-advisor) Claude
 Code plugin supports application-security work and can also manage this baseline.
