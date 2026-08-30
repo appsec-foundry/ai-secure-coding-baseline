@@ -1,6 +1,7 @@
 # AI Secure Coding Baseline
 
 [![Last commit](https://img.shields.io/github/last-commit/appsec-foundry/ai-secure-coding-baseline.svg)](https://github.com/appsec-foundry/ai-secure-coding-baseline/commits)
+[![codecov](https://codecov.io/gh/appsec-foundry/ai-secure-coding-baseline/graph/badge.svg)](https://codecov.io/gh/appsec-foundry/ai-secure-coding-baseline)
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-D97757?logo=anthropic&logoColor=white)](https://code.claude.com/)
 [![GitHub Copilot](https://img.shields.io/badge/GitHub%20Copilot-compatible-000000?logo=githubcopilot&logoColor=white)](https://github.com/features/copilot)
