@@ -1,4 +1,4 @@
-# AI Secure Coding Baseline
+# AI Secure Coding Baseline (aiscb)
 
 [![Last commit](https://img.shields.io/github/last-commit/appsec-foundry/aiscb.svg)](https://github.com/appsec-foundry/aiscb/commits)
 [![codecov](https://codecov.io/gh/appsec-foundry/aiscb/graph/badge.svg)](https://codecov.io/gh/appsec-foundry/aiscb)
