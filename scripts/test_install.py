@@ -577,6 +577,7 @@ with tempfile.TemporaryDirectory() as tmp:
         f"@{claude_link}\n", encoding="utf-8"
     )
     prompts = []
+    migration_output = []
     answers = iter(["1", "n", "1"])
 
     def decline_migration(prompt: str) -> str:
@@ -586,19 +587,21 @@ with tempfile.TemporaryDirectory() as tmp:
     result = install.interactive_setup(
         home=home,
         input_fn=decline_migration,
-        output=lambda _line: None,
+        output=migration_output.append,
         check_online=False,
         state_path=sandbox / "state.json",
         current_root=project,
     )
-    check("the migration prompt explains the change and its benefit",
+    check("the migration prompt names the file, the benefit, and stays short",
           result == 2
-          and any(
-              "Claude Code currently loads the baseline from a file outside the "
-              "managed user directory." in prompt
-              and "keeps working if that file is moved or removed" in prompt
-              for prompt in prompts
-          ), str(prompts))
+          and any("Claude Code reads the baseline from a file this setup does not "
+                  "manage" in line for line in migration_output)
+          and any(str(source) in line for line in migration_output)
+          and any("keeps working when that file moves" in line
+                  for line in migration_output)
+          and any(prompt.startswith("Use a user-wide copy instead?")
+                  for prompt in prompts),
+          f"output={migration_output!r}, prompts={prompts!r}")
 
 with tempfile.TemporaryDirectory() as tmp:
     sandbox = Path(tmp)

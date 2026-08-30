@@ -1821,26 +1821,26 @@ def _install_user_interactively(
             if any(tool in installation.tools for installation in legacy)
         ]
         legacy_labels = [TOOL_LABELS[tool] for tool in legacy_tools]
-        if not legacy_labels:
-            legacy_subject = "This user installation"
-            legacy_verb = "loads"
-            legacy_pronoun = "it"
-        elif len(legacy_labels) == 1:
-            legacy_subject = legacy_labels[0]
-            legacy_verb = "loads"
-            legacy_pronoun = "it"
-        else:
+        if len(legacy_labels) > 1:
             legacy_subject = (
                 ", ".join(legacy_labels[:-1]) + f" and {legacy_labels[-1]}"
             )
-            legacy_verb = "load"
-            legacy_pronoun = "they"
-        migration_question = (
-            f"{legacy_subject} currently {legacy_verb} the baseline from a file "
-            "outside the managed user directory. Use a user-wide copy instead so "
-            f"{legacy_pronoun} keeps working if that file is moved or removed?"
+            legacy_verb = "read"
+        else:
+            legacy_subject = legacy_labels[0] if legacy_labels else "This installation"
+            legacy_verb = "reads"
+    if legacy:
+        output(
+            f"\n{legacy_subject} {legacy_verb} the baseline from a file this setup "
+            "does not manage, at"
         )
-    if legacy and ask_yes_no(input_fn, migration_question, True):
+        for installation in legacy:
+            output(f"  {display_path(installation.source)}")
+        output(
+            f"A user-wide copy keeps working when that file moves, and it receives "
+            f"{available.baseline_id}."
+        )
+    if legacy and ask_yes_no(input_fn, "Use a user-wide copy instead?", True):
         for installation in legacy:
             reviewed_updates.add(_update_key(installation))
             report, migrated = migrate_legacy_user(installation, available)
