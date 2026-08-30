@@ -81,15 +81,15 @@ tests that identify the bundle. The release sequence is: commit and check the
 bundle files, create the bundle tag on that commit, then change `setup.sh` to
 the new tag and hashes. A documentation-only commit does not need a new bundle.
 
-Every published baseline release must update the complete Quick start one-liner
-in `README.md`, even though its command shape stays the same. It must name the
-bootstrap commit for that release and the exact SHA-256 of `setup.sh` in that
-commit; `scripts/test_install.py` enforces the hash match. Do not publish a
-release while the README command still installs the previous bundle. Because
+Every published baseline release must update the complete Quick start command
+block in `README.md`, even though its command structure stays the same. It must
+name the bootstrap commit for that release and the exact SHA-256 of `setup.sh`
+in that commit; `scripts/test_install.py` enforces the hash match. Do not publish
+a release while the README command still installs the previous bundle. Because
 the bootstrap commit is only known after it is created, commit `setup.sh` first
-and update the one-liner in a follow-up documentation commit. Do not publish or
-merge the intermediate state where the README hash and bootstrap commit do not
-yet form a working pair.
+and update the command block in a follow-up documentation commit. Do not publish
+or merge the intermediate state where the README hash and bootstrap commit do
+not yet form a working pair.
 
 `make test` and `make test-all` are a different matter: they run the cases
 against real models. The full matrix is 60 runs and several hours of tokens.
