@@ -255,10 +255,16 @@ the managed baseline. Choose any tools or skip hooks; valid settings are merged,
 while ambiguous ones remain unchanged. Codex may require review through
 `/hooks` afterward.
 
+Once a hook is configured, setup asks whether it may look for new releases.
+The default is no, and the hook itself never makes a request: it reports what
+the last setup or status run found, together with the local update command.
+Answering yes lets a separate background process contact `api.github.com` at
+most once a day, which never delays a session.
+
 The installer uses the latest published release when available, otherwise the
 checkout copy. `ARGS=--offline` skips the release check. Replacing a locally
 edited managed baseline requires confirmation and creates a backup. The same
-detection runs read-only with `make status`.
+detection runs with `make status`, which changes no installation.
 
 ### Claude Code
 

@@ -16,15 +16,18 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 HELPER = REPO / "scripts" / "show_baseline_version.py"
 BASELINE = "secure-coding-baseline.md"
 MAX_BASELINE_BYTES = 256 * 1024
+REGISTRY_FILE = ".config/ai-secure-coding-baseline/installations.json"
 
 sys.path.insert(0, str(HELPER.parent))
 import show_baseline_version as hook  # noqa: E402
@@ -81,11 +84,29 @@ def helper_in(root: Path):
         hook.__file__ = original
 
 
+@contextlib.contextmanager
+def home_at(root: Path):
+    """Point the registry lookup at the prepared directory, not the real home."""
+    previous = {name: os.environ.get(name) for name in ("HOME", "USERPROFILE")}
+    os.environ.update({name: str(root) for name in previous})
+    try:
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
 def call(layout: dict[str, object],
          argv: list[str] | None = None) -> tuple[object, str, str]:
-    root = build(layout)
+    return call_in(build(layout), argv)
+
+
+def call_in(root: Path, argv: list[str] | None = None) -> tuple[object, str, str]:
     out, err = io.StringIO(), io.StringIO()
-    with helper_in(root), contextlib.redirect_stdout(out), \
+    with helper_in(root), home_at(root), contextlib.redirect_stdout(out), \
             contextlib.redirect_stderr(err):
         try:
             code: object = hook.main(argv or [])
@@ -143,6 +164,86 @@ def check_failures(failures: list[str]) -> None:
             failures.append(f"{label}: leaked internals: {err[:200]!r}")
 
 
+def registry_layout(section: object) -> dict[str, object]:
+    """The installer's registry, as the helper finds it below the home directory."""
+    return {
+        **ABOVE,
+        REGISTRY_FILE: json.dumps(
+            {"schema": 1, "projects": {}, "user": None, "update_check": section}
+        ),
+    }
+
+
+def check_update_note(failures: list[str]) -> None:
+    """Only a genuinely newer release of this baseline is announced."""
+    silent = [
+        ("the same version", {"latest": VALID_ID}),
+        ("an older release", {"latest": "aisec-0.1.9"}),
+        ("another baseline's name", {"latest": "acme-9.9.9"}),
+        ("a value that is not a version", {"latest": "; rm -rf /"}),
+        ("a missing version", {"enabled": False}),
+        ("a section that is not an object", "aisec-9.9.9"),
+    ]
+    for label, section in silent:
+        code, out, _ = call(registry_layout(section))
+        if code != 0 or "Update" in out:
+            failures.append(f"{label}: expected no note, got {out[:160]!r}")
+
+    code, out, _ = call(registry_layout({"latest": "aisec-0.2.0"}))
+    if code != 0 or "Update aisec-0.2.0 available" not in out:
+        failures.append(f"a newer release must be announced: {out[:160]!r}")
+    if "python3" in out:
+        failures.append(f"no installer means no command: {out[:160]!r}")
+
+    root = build({**registry_layout({"latest": "aisec-0.2.0"}),
+                  "scripts/install.py": "raise SystemExit(0)\n"})
+    _code, out, _err = call_in(root)
+    if f"python3 {root / 'scripts' / 'install.py'} --interactive" not in out:
+        failures.append(f"the note must name the local installer: {out[:200]!r}")
+
+    for label, payload in (
+        ("invalid registry JSON", "not json"),
+        ("a registry without the section", json.dumps({"schema": 1})),
+        ("an oversized registry", json.dumps({"schema": 1, "pad": "x" * 200_000})),
+    ):
+        code, out, _ = call({**ABOVE, REGISTRY_FILE: payload})
+        if code != 0 or "Update" in out:
+            failures.append(
+                f"{label}: expected a plain banner, got {code} {out[:160]!r}"
+            )
+
+
+def check_background_refresh(failures: list[str]) -> None:
+    """The refresh runs only when it was allowed and the cache is stale."""
+    marker_installer = (
+        "import pathlib, sys\n"
+        "pathlib.Path(__file__).with_name('refreshed')"
+        ".write_text(' '.join(sys.argv[1:]))\n"
+    )
+    stale, fresh = 1, int(time.time())
+    cases = [
+        ("allowed and stale", {"enabled": True, "checked": stale}, True),
+        ("allowed but fresh", {"enabled": True, "checked": fresh}, False),
+        ("not allowed", {"enabled": False, "checked": stale}, False),
+        ("never asked", {"checked": stale}, False),
+    ]
+    for label, section, expected in cases:
+        root = build({**registry_layout(section),
+                      "scripts/install.py": marker_installer})
+        marker = root / "scripts" / "refreshed"
+        call_in(root)
+        for _ in range(50):
+            if marker.is_file():
+                break
+            time.sleep(0.1)
+        if marker.is_file() != expected:
+            failures.append(
+                f"{label}: refresh {'missing' if expected else 'started anyway'}"
+            )
+        elif expected and "--refresh-update-cache" not in marker.read_text():
+            failures.append(f"{label}: refreshed with {marker.read_text()[:80]!r}")
+
+
 def check_arguments(failures: list[str]) -> None:
     """An unknown output format is rejected rather than guessed."""
     code, out, _ = call(ABOVE, ["--output", "yaml"])
@@ -175,6 +276,8 @@ def main() -> int:
     failures: list[str] = []
     check_success(failures)
     check_failures(failures)
+    check_update_note(failures)
+    check_background_refresh(failures)
     check_arguments(failures)
     check_installed_script(failures)
 

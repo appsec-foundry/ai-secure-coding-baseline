@@ -12,6 +12,7 @@ import shlex
 import stat
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -42,6 +43,7 @@ SOURCE = REPO / BASELINE
 # in that place survives. Append the new digest whenever the helper changes.
 KNOWN_HOOK_DIGESTS = (
     "b43737769f40c85ff056e6e237b7b3035a1617eddf9a4269b92c8bd8ba78b182",
+    "3e0961143718b21cc16317ef63a5ce6d4a34dcf91bda7ad6577f160e4927f89d",
 )
 COPILOT_VERSION_HOOK_NAME = "aisec-baseline-version.json"
 TOOLS = ("claude", "codex", "copilot")
@@ -70,6 +72,7 @@ MAX_HOOK_CONFIG_BYTES = 128 * 1024
 MAX_PROJECTS = 200
 MAX_COLUMN = 40
 REGISTRY_SCHEMA = 1
+UPDATE_CHECK_KEY = "update_check"
 
 SEMVER_TEXT = (
     r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
@@ -323,22 +326,22 @@ def fetch_release_baseline(
     return baseline
 
 
-def latest_available(check_online: bool) -> tuple[Baseline, str]:
-    """Return the baseline to install and a short note for the origin line."""
+def latest_available(check_online: bool) -> tuple[Baseline, str, Baseline | None]:
+    """Return the baseline to install, a note for the origin line, and the release."""
     bundled = bundled_baseline()
     if not check_online:
-        return bundled, ", online check skipped"
+        return bundled, ", online check skipped", None
     try:
         released = fetch_release_baseline()
     except urllib.error.HTTPError as error:
         if error.code == 404:
-            return bundled, ", no published release"
-        return bundled, ", online check unavailable"
+            return bundled, ", no published release", None
+        return bundled, ", online check unavailable", None
     except (OSError, ValueError, json.JSONDecodeError):
-        return bundled, ", online check unavailable"
+        return bundled, ", online check unavailable", None
     if bundled.version > released.version:
-        return bundled, f", newer than published {released.version}"
-    return released, ""
+        return bundled, f", newer than published {released.version}", released
+    return released, "", released
 
 
 def project_targets(root: Path) -> dict[str, list[tuple[str, Path]]]:
@@ -889,6 +892,48 @@ def save_registry(path: Path, registry: dict[str, object]) -> None:
     else:
         _write_new(path, payload)
         os.chmod(path, 0o600)
+
+
+def update_check_enabled(registry: dict[str, object]) -> bool:
+    section = registry.get(UPDATE_CHECK_KEY)
+    return isinstance(section, dict) and section.get("enabled") is True
+
+
+def record_update_check(registry: dict[str, object], released: Baseline) -> None:
+    """Cache the published version so the startup hook reports it without asking."""
+    section = registry.get(UPDATE_CHECK_KEY)
+    registry[UPDATE_CHECK_KEY] = {
+        **(section if isinstance(section, dict) else {}),
+        "latest": released.baseline_id,
+        "checked": int(time.time()),
+    }
+
+
+def cache_release_check(
+    state_path: Path, registry: dict[str, object], released: Baseline | None
+) -> bool:
+    """Store a release the caller already fetched; a cache is never worth a crash."""
+    if released is None:
+        return False
+    record_update_check(registry, released)
+    try:
+        save_registry(state_path, registry)
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def refresh_update_cache(*, home: Path, state_path: Path | None = None) -> int:
+    """Look up the published release for the startup hook, only if that was allowed."""
+    state_path = state_path or registry_path(home)
+    registry, writable, _note = load_registry(state_path)
+    if not writable or not update_check_enabled(registry):
+        return 1
+    try:
+        released = fetch_release_baseline()
+    except (urllib.error.HTTPError, OSError, ValueError, json.JSONDecodeError):
+        return 1
+    return 0 if cache_release_check(state_path, registry, released) else 1
 
 
 def _entry_digest(entry: object) -> str | None:
@@ -1607,26 +1652,51 @@ def _offer_version_hooks(
     home: Path | None,
     input_fn: Callable[[str], str],
     output: Callable[[str], None],
-) -> bool:
+) -> tuple[bool, bool]:
+    """Install the chosen startup hooks; report whether any is now configured."""
     if installed is None:
-        return False
+        return False, False
     tools = [tool for tool in selected_tools if tool in installed.tools]
     if not tools:
-        return False
+        return False, False
     hook_tools = choose_hook_tools(input_fn, output, tools)
     if not hook_tools:
-        return False
+        return False, False
     for line in install_version_hooks(hook_tools, root, home):
         output(f"  {line}")
     output("\nVerifying startup hooks:")
     incomplete = False
+    configured = False
     for tool in hook_tools:
         if _version_hook_is_installed(tool, root, home):
             output(f"  ✓ {TOOL_LABELS[tool]} hook configured")
+            configured = True
         else:
             output(f"  ! {TOOL_LABELS[tool]} hook incomplete")
             incomplete = True
-    return incomplete
+    return incomplete, configured
+
+
+def _offer_update_check(
+    registry: dict[str, object],
+    input_fn: Callable[[str], str],
+    output: Callable[[str], None],
+) -> None:
+    """Ask whether the startup hook may look up new releases in the background."""
+    output(
+        "\nThe startup hook can report that a newer baseline was released. Finding "
+        "that out contacts api.github.com once a day, in a separate process that "
+        "never delays a session. Without it the hook reports what the last setup "
+        "or status run saw."
+    )
+    section = registry.get(UPDATE_CHECK_KEY)
+    section = section if isinstance(section, dict) else {}
+    enabled = ask_yes_no(
+        input_fn,
+        "Check for new releases in the background?",
+        update_check_enabled(registry),
+    )
+    registry[UPDATE_CHECK_KEY] = {**section, "enabled": enabled}
 
 
 def _verify_baseline_tools(
@@ -1705,9 +1775,11 @@ def _install_project_interactively(
     installed = scan_project(root, entry if isinstance(entry, dict) else {})
     _record_current_scope(registry, installed, available)
     incomplete = _verify_baseline_tools(tools, installed, output)
-    hook_incomplete = _offer_version_hooks(
+    hook_incomplete, hooks_configured = _offer_version_hooks(
         tools, installed, root, None, input_fn, output
     )
+    if hooks_configured:
+        _offer_update_check(registry, input_fn, output)
     return changed or installed is not None, incomplete or hook_incomplete
 
 
@@ -1799,9 +1871,11 @@ def _install_user_interactively(
     if managed:
         _record_current_scope(registry, managed[0], available)
         incomplete = _verify_baseline_tools(tools, managed[0], output)
-        hook_incomplete = _offer_version_hooks(
+        hook_incomplete, hooks_configured = _offer_version_hooks(
             tools, managed[0], Path.cwd(), home, input_fn, output
         )
+        if hooks_configured:
+            _offer_update_check(registry, input_fn, output)
         return True, incomplete or hook_incomplete
     _verify_baseline_tools(tools, None, output)
     return changed, True
@@ -1832,9 +1906,11 @@ def interactive_setup(
     output("Install or update the baseline for Claude Code, Codex, and Copilot.")
     output("Existing instruction files are preserved; conflicts are reported.")
     output("\nChecking the available baseline...")
-    available, online_note = latest_available(check_online)
+    available, online_note, released = latest_available(check_online)
     state_path = state_path or registry_path(home)
     registry, registry_writable, registry_note = load_registry(state_path)
+    if registry_writable:
+        cache_release_check(state_path, registry, released)
     explicit_project = current_root is not None
     location = (current_root or Path.cwd()).resolve()
     if not location.is_dir():
@@ -1947,9 +2023,11 @@ def installation_status(
     state_path: Path | None = None,
     current_root: Path | None = None,
 ) -> int:
-    available, online_note = latest_available(check_online)
+    available, online_note, released = latest_available(check_online)
     state_path = state_path or registry_path(home)
-    registry, _registry_writable, registry_note = load_registry(state_path)
+    registry, registry_writable, registry_note = load_registry(state_path)
+    if registry_writable:
+        cache_release_check(state_path, registry, released)
     current_root = (current_root or Path.cwd()).resolve()
     if current_root == Path(current_root.anchor) or not current_root.is_dir():
         raise ValueError("current project must be an existing non-root directory")
@@ -1996,14 +2074,26 @@ def main(argv: list[str] | None = None) -> int:
         "--interactive", action="store_true", help="run the guided setup and updater"
     )
     parser.add_argument(
-        "--status", action="store_true", help="show installation status without changes"
+        "--status",
+        action="store_true",
+        help="show installation status without changing an installation",
     )
     parser.add_argument(
         "--offline",
         action="store_true",
         help="skip the release check during setup or status",
     )
+    parser.add_argument(
+        "--refresh-update-cache",
+        action="store_true",
+        help="look up the published release for the startup hook, if setup allowed it",
+    )
     args = parser.parse_args(argv)
+
+    if args.refresh_update_cache:
+        if args.tools or args.user or args.status or args.interactive or args.offline:
+            parser.error("--refresh-update-cache takes no other arguments")
+        return refresh_update_cache(home=Path.home())
 
     if args.interactive:
         if args.tools or args.user or args.status:

@@ -426,7 +426,7 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     state = home / "state.json"
-    answers = iter(["1", "", ""])
+    answers = iter(["1", "", "", "y"])
     output: list[str] = []
     result = install.interactive_setup(
         home=home,
@@ -447,6 +447,9 @@ with tempfile.TemporaryDirectory() as tmp:
           and (home / ".codex" / "hooks.json").is_file()
           and (home / ".copilot" / "hooks"
                / install.COPILOT_VERSION_HOOK_NAME).is_file(), str(output))
+    check("guided setup records the answer about background release checks",
+          json.loads(state.read_text())["update_check"]["enabled"] is True,
+          state.read_text())
     check("guided setup explains its purpose and progress",
           output[:4] == [
               "AI Secure Coding Baseline setup",
@@ -976,16 +979,16 @@ def available_with(error: Exception | None):
         install.fetch_release_baseline = original
 
 
-offline_baseline, offline_note = install.latest_available(False)
+offline_baseline, offline_note, _released = install.latest_available(False)
 check("an offline check uses the bundled baseline",
       offline_baseline.digest == bundled.digest and "skipped" in offline_note)
-_, missing_note = available_with(FakeHTTPError(404))
+_, missing_note, _released = available_with(FakeHTTPError(404))
 check("a repository without releases falls back to the bundled baseline",
       "no published release" in missing_note, missing_note)
 for label, error in (("a server error", FakeHTTPError(500)),
                      ("an unreachable host", OSError("no route")),
                      ("an invalid payload", ValueError("bad json"))):
-    _, note = available_with(error)
+    _, note, _released = available_with(error)
     check(f"{label} falls back to the bundled baseline",
           "online check unavailable" in note, note)
 
@@ -998,12 +1001,66 @@ def newer_release(*_args, **_kwargs):
 original_fetch = install.fetch_release_baseline
 install.fetch_release_baseline = newer_release
 try:
-    kept, newer_note = install.latest_available(True)
+    kept, newer_note, published = install.latest_available(True)
 finally:
     install.fetch_release_baseline = original_fetch
 check("a bundled baseline newer than the release wins",
       kept.digest == bundled.digest and "newer than published" in newer_note,
       newer_note)
+
+# --- the release cache the startup hook reads ------------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    state = home / "state.json"
+    original_fetch = install.fetch_release_baseline
+
+
+    def unreachable(*_args, **_kwargs):
+        raise OSError("no route")
+
+
+    install.fetch_release_baseline = lambda *_args, **_kwargs: bundled
+    try:
+        without_consent = install.refresh_update_cache(home=home, state_path=state)
+        untouched = not state.exists()
+        install.save_registry(
+            state, {**install.empty_registry(), "update_check": {"enabled": True}}
+        )
+        with_consent = install.refresh_update_cache(home=home, state_path=state)
+        cached = json.loads(state.read_text())["update_check"]
+        install.fetch_release_baseline = unreachable
+        offline = install.refresh_update_cache(home=home, state_path=state)
+    finally:
+        install.fetch_release_baseline = original_fetch
+    check("a background refresh runs only after the setup question was answered",
+          without_consent == 1 and untouched and with_consent == 0
+          and cached.get("latest") == bundled.baseline_id
+          and isinstance(cached.get("checked"), int)
+          and cached.get("enabled") is True,
+          state.read_text())
+    check("an unreachable update server leaves the cache alone",
+          offline == 1
+          and json.loads(state.read_text())["update_check"] == cached,
+          state.read_text())
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    state = home / "state.json"
+    original_fetch = install.fetch_release_baseline
+    install.fetch_release_baseline = lambda *_args, **_kwargs: bundled
+    try:
+        install.installation_status(
+            home=home,
+            output=lambda _line: None,
+            state_path=state,
+            current_root=home,
+        )
+    finally:
+        install.fetch_release_baseline = original_fetch
+    check("a status run caches what the release check found",
+          json.loads(state.read_text())["update_check"]["latest"]
+          == bundled.baseline_id, state.read_text())
 
 # --- placement refusals ----------------------------------------------------
 
@@ -1287,6 +1344,8 @@ REJECTED_ARGUMENTS = [
     ("--status with tools", ["--status", "codex"]),
     ("--status with --user", ["--status", "--user"]),
     ("--into on the filesystem root", ["codex", "--into", "/"]),
+    ("--refresh-update-cache with another mode",
+     ["--refresh-update-cache", "--status"]),
 ]
 
 with tempfile.TemporaryDirectory() as tmp:
