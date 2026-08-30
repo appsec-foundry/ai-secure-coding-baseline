@@ -578,6 +578,29 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     install.install(list(install.TOOLS), home, home)
+    older = bundled.content.replace(bundled.baseline_id.encode(), b"aiscb-0.1.1", 1)
+    install.install(["codex"], project, None, content=older)
+    prompts = []
+    output = []
+    install.interactive_setup(
+        home=home,
+        input_fn=lambda prompt: prompts.append(prompt) or "n",
+        output=output.append,
+        check_online=False,
+        state_path=sandbox / "state.json",
+        current_root=project,
+    )
+    legend = [line for line in output if line.startswith("  ✓ current")]
+    check("a mixed table explains only the symbols it uses",
+          legend == ["  ✓ current  ↻ update available"], str(output[:12]))
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+    install.install(list(install.TOOLS), home, home)
     install.install(list(install.TOOLS), project, None)
     registry = install.empty_registry()
     for item in install.scan_user(home, {}):
@@ -598,6 +621,9 @@ with tempfile.TemporaryDirectory() as tmp:
         state_path=state,
         current_root=project,
     )
+    check("a table of one condition needs no legend",
+          not any("current" in line and "not installed" in line
+                  for line in output), str(output[:12]))
     check("a setup with nothing left to do defaults to leaving",
           result == 0
           and prompts == ["Choice [3]: "]

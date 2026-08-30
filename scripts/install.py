@@ -1630,7 +1630,20 @@ def _show_setup_status(
     rows += [_installation_row(item, available, current_root) for item in other]
 
     output("\nInstallations")
-    output("  ✓ current  ↻ update available  • review needed  - not installed")
+    # Each row states its condition in words; the legend only helps to group a
+    # mixed table, so it names the symbols in use and nothing else.
+    legend = [
+        f"{symbol} {meaning}"
+        for symbol, meaning in (
+            ("✓", "current"),
+            ("↻", "update available"),
+            ("•", "review needed"),
+            ("-", "not installed"),
+        )
+        if any(row[0] == symbol for row in rows)
+    ]
+    if len(legend) > 1:
+        output("  " + "  ".join(legend))
     _show_rows(output, rows)
 
 
