@@ -594,9 +594,9 @@ with tempfile.TemporaryDirectory() as tmp:
     check("the migration prompt explains the change and its benefit",
           result == 2
           and any(
-              "Claude Code currently loads the baseline from a repository checkout."
-              in prompt
-              and "keeps working if that checkout is moved or removed" in prompt
+              "Claude Code currently loads the baseline from a file outside the "
+              "managed user directory." in prompt
+              and "keeps working if that file is moved or removed" in prompt
               for prompt in prompts
           ), str(prompts))
 
@@ -677,7 +677,7 @@ with tempfile.TemporaryDirectory() as tmp:
           result == 0
           and any(line.startswith("  -") and "project" in line
                   and "not installed" in line for line in output)
-          and "  1. tools for user" in output
+          and "  1. change tools for user" in output
           and any(line.startswith("  2. install in project ")
                   and str(project) in line for line in output),
           str(output))

@@ -1456,6 +1456,8 @@ def _detect_project_root(location: Path) -> Path | None:
 
 def _installation_state(installation: Installation, available: Baseline) -> str:
     if not installation.baseline.is_official:
+        if installation.baseline.name != OFFICIAL_NAME:
+            return f"{installation.baseline.name} baseline, no auto-update"
         return "customized, no auto-update"
     if installation.kind == "unmanaged":
         return "manual file, no auto-update"
@@ -1834,9 +1836,9 @@ def _install_user_interactively(
             legacy_verb = "load"
             legacy_pronoun = "they"
         migration_question = (
-            f"{legacy_subject} currently {legacy_verb} the baseline from a repository "
-            "checkout. Use a user-wide copy instead so "
-            f"{legacy_pronoun} keeps working if that checkout is moved or removed?"
+            f"{legacy_subject} currently {legacy_verb} the baseline from a file "
+            "outside the managed user directory. Use a user-wide copy instead so "
+            f"{legacy_pronoun} keeps working if that file is moved or removed?"
         )
     if legacy and ask_yes_no(input_fn, migration_question, True):
         for installation in legacy:
@@ -1964,8 +1966,10 @@ def interactive_setup(
         for item in installations
     )
     user_installed = any(item.kind in {"user", "legacy-user"} for item in installations)
-    current_action = "tools in project" if current_installed else "install in project"
-    user_action = "tools for user" if user_installed else "install for user"
+    current_action = (
+        "change tools in project" if current_installed else "install in project"
+    )
+    user_action = "change tools for user" if user_installed else "install for user"
     output("\nWhat would you like to do?")
     output(f"  1. {user_action}")
     if project_root is not None:
