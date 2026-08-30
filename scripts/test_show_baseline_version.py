@@ -198,8 +198,8 @@ def check_update_note(failures: list[str]) -> None:
     root = build({**registry_layout({"latest": "aiscb-0.2.0"}),
                   "scripts/install.py": "raise SystemExit(0)\n"})
     _code, out, _err = call_in(root)
-    if f"python3 {root / 'scripts' / 'install.py'} --interactive" not in out:
-        failures.append(f"the note must name the local installer: {out[:200]!r}")
+    if "current verified Quick start" not in out or "python3" in out:
+        failures.append(f"the note must name the verified update path: {out[:200]!r}")
 
     for label, payload in (
         ("invalid registry JSON", "not json"),

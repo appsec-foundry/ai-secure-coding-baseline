@@ -109,9 +109,7 @@ def update_note(installed: str, helper_dir: Path, home: Path) -> str:
         return ""
     if published[0] != current[0] or published[1] <= current[1]:
         return ""
-    if installer is None:
-        return f"Update {latest} available."
-    return f"Update {latest} available: python3 {installer} --interactive"
+    return f"Update {latest} available. Use the current verified Quick start."
 
 
 def main(argv: list[str] | None = None) -> int:
