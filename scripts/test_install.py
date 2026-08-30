@@ -123,6 +123,36 @@ with tempfile.TemporaryDirectory() as tmp:
     check("an invalid installation registry is never overwritten",
           not writable and note is not None and state.read_text() == "not json\n")
 
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+    install.install(["codex"], project, None)
+    previous = install.empty_registry()
+    install.record_installation(
+        previous, install.scan_project(project, {}), trusted=True
+    )
+    old_state = install.previous_registry_path(home)
+    install.save_registry(old_state, previous)
+    current_state = install.registry_path(home)
+    imported, writable, note = install.load_registry_with_previous(
+        home, current_state
+    )
+    projects = imported.get("projects")
+    archived_states = list(old_state.parent.glob("installations.json.migrated*"))
+    check("the previous registry path is imported and archived",
+          writable
+          and isinstance(projects, dict)
+          and str(project.resolve()) in projects
+          and current_state.is_file()
+          and not old_state.exists()
+          and len(archived_states) == 1
+          and note is not None
+          and "Imported installation records" in note,
+          str(note))
+
 check("stable SemVer sorts after its prerelease",
       install.SemVer.parse("1.0.0-rc.1") < install.SemVer.parse("1.0.0"))
 check("numeric SemVer prereleases sort numerically",
@@ -134,6 +164,17 @@ except ValueError:
 else:
     invalid_semver_rejected = False
 check("invalid SemVer numeric prereleases are rejected", invalid_semver_rejected)
+
+original_origin = install.LOCAL_ORIGIN
+try:
+    install.LOCAL_ORIGIN = "installed copy"
+    installed_copy_checks_online = install._interactive_check_online(False)
+finally:
+    install.LOCAL_ORIGIN = original_origin
+check("an installed copy cannot replace its verified bundle from the network",
+      not installed_copy_checks_online
+      and not install._interactive_check_online(True)
+      and install._interactive_check_online(False))
 
 tool_prompts: list[str] = []
 tool_output: list[str] = []
@@ -252,7 +293,12 @@ with tempfile.TemporaryDirectory() as tmp:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(
             {"hooks": {"SessionStart": [maker(elsewhere, False)]}}), encoding="utf-8")
-    copilot = home / ".copilot" / "hooks" / install.COPILOT_VERSION_HOOK_NAME
+    copilot = (
+        home
+        / ".copilot"
+        / "hooks"
+        / install.PREVIOUS_COPILOT_VERSION_HOOK_NAME
+    )
     copilot.parent.mkdir(parents=True, exist_ok=True)
     copilot.write_text(json.dumps(
         install._copilot_version_config(elsewhere, False)), encoding="utf-8")
@@ -264,7 +310,28 @@ with tempfile.TemporaryDirectory() as tmp:
           all(install._version_hook_is_installed(tool, home, home)
               for tool in install.TOOLS)
           and len(entries) == 1
-          and sum(line.startswith("updated") for line in report) == 3, str(report))
+          and not copilot.exists()
+          and any("migrated to" in line for line in report), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    install.install(["copilot"], home, home)
+    previous = (
+        home
+        / ".copilot"
+        / "hooks"
+        / install.PREVIOUS_COPILOT_VERSION_HOOK_NAME
+    )
+    previous.parent.mkdir(parents=True, exist_ok=True)
+    foreign = {"version": 1, "hooks": {"sessionStart": []}}
+    previous.write_text(json.dumps(foreign), encoding="utf-8")
+    report = install.install_version_hooks(["copilot"], home, home)
+    current = previous.with_name(install.COPILOT_VERSION_HOOK_NAME)
+    check("a foreign hook under the previous Copilot name is not migrated",
+          json.loads(previous.read_text(encoding="utf-8")) == foreign
+          and not current.exists()
+          and any("blocked" in line and str(previous) in line for line in report),
+          str(report))
 
 with tempfile.TemporaryDirectory() as tmp:
     home = Path(tmp)
@@ -540,6 +607,80 @@ with tempfile.TemporaryDirectory() as tmp:
 with tempfile.TemporaryDirectory() as tmp:
     sandbox = Path(tmp)
     home = sandbox / "home"
+    plain = sandbox / "plain-directory"
+    previous_data = install.previous_user_data_root(home)
+    home.mkdir()
+    plain.mkdir()
+    previous_data.mkdir(parents=True)
+    previous_source = previous_data / install.BASELINE
+    previous_source.write_bytes(
+        bundled.content.replace(
+            bundled.baseline_id.encode(), b"aisec-0.1.9", 1
+        )
+    )
+    previous_helper = previous_data / install.VERSION_HOOK_NAME
+    previous_helper.write_bytes(install.VERSION_HOOK_SOURCE.read_bytes())
+
+    claude_link = home / ".claude" / install.BASELINE
+    claude_link.parent.mkdir()
+    claude_link.symlink_to(previous_source)
+    (home / ".claude" / "CLAUDE.md").write_text(
+        f"@{claude_link}\n", encoding="utf-8"
+    )
+    codex_link = home / ".codex" / "AGENTS.md"
+    codex_link.parent.mkdir()
+    codex_link.symlink_to(previous_source)
+    (home / ".claude" / "settings.json").write_text(
+        json.dumps({"hooks": {"SessionStart": [
+            install._claude_version_hook(previous_helper, False)
+        ]}}),
+        encoding="utf-8",
+    )
+    (home / ".codex" / "hooks.json").write_text(
+        json.dumps({"hooks": {"SessionStart": [
+            install._codex_version_hook(previous_helper, False)
+        ]}}),
+        encoding="utf-8",
+    )
+
+    prompts = []
+    output = []
+
+    def accept_aiscb_migration(prompt: str) -> str:
+        prompts.append(prompt)
+        return ""
+
+    previous_cwd = Path.cwd()
+    try:
+        os.chdir(plain)
+        result = install.interactive_setup(
+            home=home,
+            input_fn=accept_aiscb_migration,
+            output=output.append,
+            check_online=False,
+            state_path=sandbox / "state.json",
+        )
+    finally:
+        os.chdir(previous_cwd)
+
+    managed_source = install.user_source(home)
+    check("the guided default migrates the released aisec user install to aiscb",
+          result == 0
+          and any(prompt == "Choice [1]: " for prompt in prompts)
+          and any("migration" in line and bundled.baseline_id in line
+                  for line in output)
+          and any("previous managed location" in line for line in output)
+          and install.read_baseline(managed_source).baseline_id
+              == bundled.baseline_id
+          and claude_link.resolve() == managed_source.resolve()
+          and codex_link.resolve() == managed_source.resolve()
+          and install._version_hook_is_installed("claude", home, home)
+          and install._version_hook_is_installed("codex", home, home),
+          f"output={output!r}, prompts={prompts!r}")
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
     project = sandbox / "project"
     foreign = sandbox / "foreign"
     home.mkdir()
@@ -724,6 +865,7 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check("the migration prompt names the file, the benefit, and stays short",
           result == 2
+          and any(prompt == "Choice [4]: " for prompt in prompts)
           and any("Claude Code reads the baseline from a file this setup does not "
                   "manage" in line for line in migration_output)
           and any(str(source) in line for line in migration_output)

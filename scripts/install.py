@@ -25,6 +25,7 @@ BASELINE = "secure-coding-baseline.md"
 VERSION_HOOK_DIR = ".aiscb"
 VERSION_HOOK_NAME = "show-baseline-version.py"
 INSTALLER_NAME = "install.py"
+PREVIOUS_DATA_DIR_NAME = "ai-secure-coding-baseline"
 INSTALLER_SOURCE = Path(__file__).resolve()
 # A checkout and the remote bundle keep this file in scripts/, with the baseline
 # one level above. The copy placed beside an installed baseline sits next to it,
@@ -46,9 +47,8 @@ KNOWN_HOOK_DIGESTS = (
     "3e0961143718b21cc16317ef63a5ce6d4a34dcf91bda7ad6577f160e4927f89d",
     "9ab4a0107dec2cac076c75a0eedb0c768a18846b60a33851550544a656b249ba",
 )
-# Installed file names are installation state, not identity: renaming one
-# leaves an existing installation with an orphaned hook beside the new one.
-COPILOT_VERSION_HOOK_NAME = "aisec-baseline-version.json"
+COPILOT_VERSION_HOOK_NAME = "aiscb-baseline-version.json"
+PREVIOUS_COPILOT_VERSION_HOOK_NAME = "aisec-baseline-version.json"
 TOOLS = ("claude", "codex", "copilot")
 TOOL_LABELS = {
     "claude": "Claude Code",
@@ -357,6 +357,10 @@ def project_targets(root: Path) -> dict[str, list[tuple[str, Path]]]:
 
 def user_data_root(home: Path) -> Path:
     return home / ".local" / "share" / "aiscb"
+
+
+def previous_user_data_root(home: Path) -> Path:
+    return home / ".local" / "share" / PREVIOUS_DATA_DIR_NAME
 
 
 def user_source(home: Path) -> Path:
@@ -814,6 +818,38 @@ def _install_copilot_version_hook(
     report.append(f"wrote {path}")
 
 
+def _install_copilot_version_hook_with_migration(
+    path: Path,
+    previous: Path,
+    config: dict[str, object],
+    report: list[str],
+) -> None:
+    if not previous.exists() and not previous.is_symlink():
+        _install_copilot_version_hook(path, config, report)
+        return
+    try:
+        previous_config, existed = _read_hook_config(previous)
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+        report.append(f"blocked {previous}: cannot safely migrate the previous hook")
+        return
+    if not existed or not _is_moved_version_hook(previous_config, config):
+        report.append(
+            f"blocked {previous}: contains different hook configuration; "
+            "remove it to let setup migrate to the current hook name"
+        )
+        return
+    _install_copilot_version_hook(path, config, report)
+    try:
+        current, current_exists = _read_hook_config(path)
+        if not current_exists or current != config:
+            return
+        previous.unlink()
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+        report.append(f"blocked {previous}: could not remove the migrated hook")
+        return
+    report.append(f"removed {previous}: migrated to {path}")
+
+
 def install_version_hooks(
     tools: list[str], root: Path, home: Path | None
 ) -> list[str]:
@@ -843,8 +879,19 @@ def install_version_hooks(
                 if project
                 else home / ".copilot" / "hooks" / COPILOT_VERSION_HOOK_NAME
             )
-            _install_copilot_version_hook(
-                settings, _copilot_version_config(helper, project), report
+            previous_settings = (
+                root / ".github" / "hooks" / PREVIOUS_COPILOT_VERSION_HOOK_NAME
+                if project
+                else home
+                / ".copilot"
+                / "hooks"
+                / PREVIOUS_COPILOT_VERSION_HOOK_NAME
+            )
+            _install_copilot_version_hook_with_migration(
+                settings,
+                previous_settings,
+                _copilot_version_config(helper, project),
+                report,
             )
     return report
 
@@ -900,6 +947,19 @@ def registry_path(home: Path) -> Path:
     return home / ".config" / "aiscb" / "installations.json"
 
 
+def previous_registry_path(home: Path) -> Path:
+    return home / ".config" / PREVIOUS_DATA_DIR_NAME / "installations.json"
+
+
+def _migrated_registry_path(path: Path) -> Path:
+    candidate = path.with_name(f"{path.name}.migrated")
+    for number in range(1, 101):
+        if not candidate.exists() and not candidate.is_symlink():
+            return candidate
+        candidate = path.with_name(f"{path.name}.migrated.{number}")
+    raise ValueError("too many previous registry backups")
+
+
 def empty_registry() -> dict[str, object]:
     return {"schema": REGISTRY_SCHEMA, "projects": {}, "user": None}
 
@@ -940,6 +1000,77 @@ def save_registry(path: Path, registry: dict[str, object]) -> None:
         os.chmod(path, 0o600)
 
 
+def load_registry_with_previous(
+    home: Path, path: Path
+) -> tuple[dict[str, object], bool, str | None]:
+    """Load current state and retain valid records from the previous location."""
+    registry, writable, note = load_registry(path)
+    current_path = registry_path(home)
+    if (
+        not writable
+        or path.resolve(strict=False) != current_path.resolve(strict=False)
+    ):
+        return registry, writable, note
+
+    previous_path = previous_registry_path(home)
+    if not previous_path.exists() and not previous_path.is_symlink():
+        return registry, writable, note
+    previous, previous_writable, _previous_note = load_registry(previous_path)
+    if not previous_writable:
+        return (
+            registry,
+            writable,
+            note or "The previous installation registry is invalid; it was not imported.",
+        )
+
+    changed = False
+    projects = registry.get("projects")
+    previous_projects = previous.get("projects")
+    if isinstance(projects, dict) and isinstance(previous_projects, dict):
+        for root, entry in previous_projects.items():
+            if len(projects) >= MAX_PROJECTS:
+                break
+            if root not in projects:
+                projects[root] = entry
+                changed = True
+    if registry.get("user") is None and isinstance(previous.get("user"), dict):
+        registry["user"] = previous["user"]
+        changed = True
+    if UPDATE_CHECK_KEY not in registry and isinstance(
+        previous.get(UPDATE_CHECK_KEY), dict
+    ):
+        registry[UPDATE_CHECK_KEY] = previous[UPDATE_CHECK_KEY]
+        changed = True
+    if changed:
+        try:
+            save_registry(path, registry)
+        except (OSError, ValueError):
+            return (
+                registry,
+                writable,
+                note
+                or "Previous installation records were found but could not be saved.",
+            )
+    try:
+        archived = _migrated_registry_path(previous_path)
+        os.replace(previous_path, archived)
+    except (OSError, ValueError):
+        return (
+            registry,
+            writable,
+            note
+            or "Previous installation records were imported, but their old file "
+            "could not be archived.",
+        )
+    return (
+        registry,
+        writable,
+        note
+        or f"Imported installation records from {previous_path}; archived the old "
+        f"registry as {archived}.",
+    )
+
+
 def update_check_enabled(registry: dict[str, object]) -> bool:
     section = registry.get(UPDATE_CHECK_KEY)
     return isinstance(section, dict) and section.get("enabled") is True
@@ -972,7 +1103,7 @@ def cache_release_check(
 def refresh_update_cache(*, home: Path, state_path: Path | None = None) -> int:
     """Look up the published release for the startup hook, only if that was allowed."""
     state_path = state_path or registry_path(home)
-    registry, writable, _note = load_registry(state_path)
+    registry, writable, _note = load_registry_with_previous(home, state_path)
     if not writable or not update_check_enabled(registry):
         return 1
     try:
@@ -1298,14 +1429,18 @@ def _remove_version_hooks(root: Path, home: Path | None, report: list[str]) -> N
                 path, "SessionStart", _codex_version_hook(helper, project), report
             )
         else:
-            path = (
-                root / ".github" / "hooks" / COPILOT_VERSION_HOOK_NAME
-                if project
-                else home / ".copilot" / "hooks" / COPILOT_VERSION_HOOK_NAME
+            hook_root = root / ".github" / "hooks" if project else (
+                home / ".copilot" / "hooks"
             )
-            _remove_copilot_version_hook(
-                path, _copilot_version_config(helper, project), report
-            )
+            for name in (
+                COPILOT_VERSION_HOOK_NAME,
+                PREVIOUS_COPILOT_VERSION_HOOK_NAME,
+            ):
+                _remove_copilot_version_hook(
+                    hook_root / name,
+                    _copilot_version_config(helper, project),
+                    report,
+                )
     if helper.is_symlink() or not helper.is_file():
         return
     try:
@@ -1673,7 +1808,20 @@ def _detect_project_root(location: Path) -> Path | None:
     return None
 
 
+def _is_previous_managed_user(installation: Installation) -> bool:
+    previous = previous_user_data_root(installation.root)
+    return (
+        installation.kind == "legacy-user"
+        and installation.source.parent.resolve(strict=False)
+        == previous.resolve(strict=False)
+    )
+
+
 def _installation_state(installation: Installation, available: Baseline) -> str:
+    if _is_previous_managed_user(installation):
+        if installation.baseline.digest == available.digest:
+            return "up to date, migration recommended"
+        return f"migration → {available.baseline_id}"
     if not installation.baseline.is_official:
         if installation.baseline.name != OFFICIAL_NAME:
             return f"{installation.baseline.name} baseline, no auto-update"
@@ -1701,6 +1849,8 @@ def _installation_state(installation: Installation, available: Baseline) -> str:
 def _installation_symbol(installation: Installation, available: Baseline) -> str:
     if installation.baseline.digest == available.digest:
         return "✓"
+    if _is_previous_managed_user(installation):
+        return "↻"
     if installation.baseline.is_official and (
         installation.baseline.version < available.version
         or installation.baseline.version == available.version
@@ -2105,11 +2255,17 @@ def _install_user_interactively(
         for item in existing
         if item.kind == "legacy-user" and _update_key(item) not in reviewed_updates
     ]
-    if legacy:
+    previous_managed = [
+        installation
+        for installation in legacy
+        if _is_previous_managed_user(installation)
+    ]
+    migration_targets = previous_managed or legacy
+    if migration_targets:
         legacy_tools = [
             tool
             for tool in TOOLS
-            if any(tool in installation.tools for installation in legacy)
+            if any(tool in installation.tools for installation in migration_targets)
         ]
         legacy_labels = [TOOL_LABELS[tool] for tool in legacy_tools]
         if len(legacy_labels) > 1:
@@ -2120,18 +2276,25 @@ def _install_user_interactively(
         else:
             legacy_subject = legacy_labels[0] if legacy_labels else "This installation"
             legacy_verb = "reads"
-    if legacy:
+    if previous_managed:
+        output(
+            f"\n{legacy_subject} {legacy_verb} the baseline from the previous "
+            "managed location:"
+        )
+        for installation in migration_targets:
+            output(f"  {display_path(installation.source)}")
+    elif migration_targets:
         output(
             f"\n{legacy_subject} {legacy_verb} the baseline from a file this setup "
             "does not manage:"
         )
-        for installation in legacy:
+        for installation in migration_targets:
             output(f"  {display_path(installation.source)}")
     migration_question = (
         f"Switch to a managed copy of {available.baseline_id}, so updates reach it?"
     )
-    if legacy and ask_yes_no(input_fn, migration_question, True, output):
-        for installation in legacy:
+    if migration_targets and ask_yes_no(input_fn, migration_question, True, output):
+        for installation in migration_targets:
             reviewed_updates.add(_update_key(installation))
             report, migrated = migrate_legacy_user(installation, available)
             for line in report:
@@ -2203,7 +2366,9 @@ def interactive_setup(
     output("\nChecking the available baseline...")
     available, online_note, released = latest_available(check_online)
     state_path = state_path or registry_path(home)
-    registry, registry_writable, registry_note = load_registry(state_path)
+    registry, registry_writable, registry_note = load_registry_with_previous(
+        home, state_path
+    )
     if registry_writable:
         cache_release_check(state_path, registry, released)
     explicit_project = current_root is not None
@@ -2256,10 +2421,16 @@ def interactive_setup(
         for item in installations
     )
     user_installed = any(item.kind in {"user", "legacy-user"} for item in installations)
+    user_needs_migration = any(
+        _is_previous_managed_user(item) for item in installations
+    )
     current_action = (
         "change tools in project" if current_installed else "install in project"
     )
-    user_action = "change tools for user" if user_installed else "install for user"
+    if user_needs_migration:
+        user_action = "migrate user installation"
+    else:
+        user_action = "change tools for user" if user_installed else "install for user"
     actions = [(user_action, "user")]
     if project_root is not None:
         actions.append(
@@ -2274,9 +2445,9 @@ def interactive_setup(
         output(f"  {number}. {label}")
     valid_choices = {str(number) for number in range(1, len(actions) + 1)}
     exit_choice = str(len(actions))
-    # Offer the user-wide install while it is missing, and the exit once it is
-    # there. Pressing Enter must never write into whatever directory this runs in.
-    default_choice = exit_choice if user_installed else "1"
+    # Offer user-wide setup while it is missing or still in the previous managed
+    # location. Pressing Enter must never write into the current directory.
+    default_choice = exit_choice if user_installed and not user_needs_migration else "1"
     choice = ""
     for _ in range(3):
         choice = _read_answer(input_fn, f"Choice [{default_choice}]: ") or default_choice
@@ -2333,7 +2504,9 @@ def installation_status(
 ) -> int:
     available, online_note, released = latest_available(check_online)
     state_path = state_path or registry_path(home)
-    registry, registry_writable, registry_note = load_registry(state_path)
+    registry, registry_writable, registry_note = load_registry_with_previous(
+        home, state_path
+    )
     if registry_writable:
         cache_release_check(state_path, registry, released)
     current_root = (current_root or Path.cwd()).resolve()
@@ -2360,7 +2533,7 @@ def uninstall(
 ) -> int:
     """Remove one scope without asking; the guided setup offers a choice."""
     state_path = state_path or registry_path(home)
-    registry, writable, note = load_registry(state_path)
+    registry, writable, note = load_registry_with_previous(home, state_path)
     if note:
         output(note)
     if user:
@@ -2407,6 +2580,11 @@ def _register_noninteractive(
     if installation:
         trusted = installation.baseline.digest == available.digest
         record_installation(registry, installation, trusted=trusted)
+
+
+def _interactive_check_online(offline: bool) -> bool:
+    """Only a checkout may replace its bundle with a release fetched at runtime."""
+    return not offline and LOCAL_ORIGIN != "installed copy"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -2470,7 +2648,13 @@ def main(argv: list[str] | None = None) -> int:
                 "without --interactive"
             )
         try:
-            return interactive_setup(home=Path.home(), check_online=not args.offline)
+            check_online = _interactive_check_online(args.offline)
+            if not args.offline and not check_online:
+                print(
+                    "This installed copy manages its verified bundle only. "
+                    "Use the current Quick start for a verified update."
+                )
+            return interactive_setup(home=Path.home(), check_online=check_online)
         except (EOFError, KeyboardInterrupt):
             print("\nSetup cancelled.", file=sys.stderr)
             return 130
@@ -2506,7 +2690,7 @@ def main(argv: list[str] | None = None) -> int:
         print(line)
 
     state_path = registry_path(Path.home())
-    registry, writable, note = load_registry(state_path)
+    registry, writable, note = load_registry_with_previous(Path.home(), state_path)
     if note:
         print(note, file=sys.stderr)
     if writable:
