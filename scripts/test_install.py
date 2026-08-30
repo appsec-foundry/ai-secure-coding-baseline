@@ -597,10 +597,9 @@ with tempfile.TemporaryDirectory() as tmp:
           and any("Claude Code reads the baseline from a file this setup does not "
                   "manage" in line for line in migration_output)
           and any(str(source) in line for line in migration_output)
-          and any("keeps working when that file moves" in line
-                  for line in migration_output)
-          and any(prompt.startswith("Use a user-wide copy instead?")
-                  for prompt in prompts),
+          and any(prompt.startswith(
+              "Switch to a managed copy of aiscb-0.1.10, so updates reach it?")
+              for prompt in prompts),
           f"output={migration_output!r}, prompts={prompts!r}")
 
 with tempfile.TemporaryDirectory() as tmp:

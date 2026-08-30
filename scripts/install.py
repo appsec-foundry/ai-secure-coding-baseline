@@ -1832,15 +1832,14 @@ def _install_user_interactively(
     if legacy:
         output(
             f"\n{legacy_subject} {legacy_verb} the baseline from a file this setup "
-            "does not manage, at"
+            "does not manage:"
         )
         for installation in legacy:
             output(f"  {display_path(installation.source)}")
-        output(
-            f"A user-wide copy keeps working when that file moves, and it receives "
-            f"{available.baseline_id}."
-        )
-    if legacy and ask_yes_no(input_fn, "Use a user-wide copy instead?", True):
+    migration_question = (
+        f"Switch to a managed copy of {available.baseline_id}, so updates reach it?"
+    )
+    if legacy and ask_yes_no(input_fn, migration_question, True):
         for installation in legacy:
             reviewed_updates.add(_update_key(installation))
             report, migrated = migrate_legacy_user(installation, available)
