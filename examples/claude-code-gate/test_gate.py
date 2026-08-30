@@ -213,16 +213,42 @@ proc = subprocess.run(
 check(proc.returncode == 0, "allowed edit should exit 0")
 check(proc.stdout.strip() == "", f"allowed edit printed output: {proc.stdout!r}")
 
-proc = subprocess.run(
-    [sys.executable, str(GATE)],
-    input="{not json",
-    capture_output=True,
-    text=True,
-    timeout=30,
-)
-check(proc.returncode == 2, "malformed input should block the edit")
-check(proc.stdout.strip() == "", "malformed input should not print a decision")
-check(bool(proc.stderr.strip()), "malformed input should be reported on stderr")
+check(gate.added_text("Bash", {"command": "curl -k https://example.com"}) is None,
+      "added_text should ignore tools it does not support")
+check(rejects_invalid({"hook_event_name": "PreToolUse", "tool_name": 5,
+                       "tool_input": {}}),
+      "a non-string tool name should be rejected")
+check(rejects_invalid({"hook_event_name": "PreToolUse", "tool_name": "Write",
+                       "tool_input": "not an object"}),
+      "a non-object tool input should be rejected")
+check(rejects_invalid({"hook_event_name": "SessionStart", "tool_name": "Write",
+                       "tool_input": {}}),
+      "another hook event should be rejected")
+
+# A gate that fails open on bad input is worse than no gate, so every refusal
+# below must block the edit rather than let it through.
+BLOCKING_INPUT = [
+    ("malformed JSON", "{not json"),
+    ("a payload that is not an object", "[]"),
+    ("a payload for another hook event",
+     json.dumps({"hook_event_name": "SessionStart", "tool_name": "Write",
+                 "tool_input": {}})),
+    ("an editing payload without its text",
+     json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Write",
+                 "tool_input": {"file_path": "/srv/app/x.py"}})),
+]
+
+for label, payload in BLOCKING_INPUT:
+    proc = subprocess.run(
+        [sys.executable, str(GATE)],
+        input=payload,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    check(proc.returncode == 2, f"{label} should block the edit")
+    check(proc.stdout.strip() == "", f"{label} should not print a decision")
+    check(bool(proc.stderr.strip()), f"{label} should be reported on stderr")
 
 if failures:
     print(f"gate: {len(failures)} problem(s)")

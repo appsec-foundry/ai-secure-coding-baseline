@@ -837,5 +837,538 @@ with tempfile.TemporaryDirectory() as tmp:
           remote.returncode == 0 and "usage: install.py" in remote.stdout,
           remote.stderr or remote.stdout)
 
+# --- update server ---------------------------------------------------------
+#
+# The updater fetches over the network, so the checks below stand in for a
+# hostile or broken server: a redirect off GitHub, an oversized body, a release
+# that does not match its tag. None of them touch the network.
+
+
+class FakeResponse:
+    def __init__(self, url: str, payload: bytes, headers: dict | None = None):
+        self._url = url
+        self._payload = payload
+        self.headers = headers or {}
+
+    def geturl(self) -> str:
+        return self._url
+
+    def read(self, size: int = -1) -> bytes:
+        return self._payload if size < 0 else self._payload[:size]
+
+    def __enter__(self) -> "FakeResponse":
+        return self
+
+    def __exit__(self, *_exc: object) -> bool:
+        return False
+
+
+class FakeOpener:
+    def __init__(self, response: FakeResponse):
+        self.response = response
+
+    def open(self, _request: object, timeout: object = None) -> FakeResponse:
+        return self.response
+
+
+def read_json_with(response: FakeResponse, url: str = install.LATEST_RELEASE_URL):
+    original = install.urllib.request.build_opener
+    install.urllib.request.build_opener = lambda *_handlers: FakeOpener(response)
+    try:
+        return install._read_json_url(url)
+    finally:
+        install.urllib.request.build_opener = original
+
+
+def rejected(call, because: str | None = None) -> bool:
+    """True when the call refuses its input.
+
+    json.JSONDecodeError is a ValueError, so a check that only catches the
+    class passes even when the guard under test is gone and the payload merely
+    fails to parse. Pass `because` wherever that confusion is possible.
+    """
+    try:
+        call()
+    except ValueError as error:
+        return because is None or because in str(error)
+    return False
+
+
+good_url = install.LATEST_RELEASE_URL
+check("plain HTTP is refused before any request",
+      rejected(lambda: install._read_json_url(good_url.replace("https://", "http://")),
+               "unexpected update server"))
+check("a foreign update host is refused before any request",
+      rejected(lambda: install._read_json_url("https://example.invalid/releases"),
+               "unexpected update server"))
+check("a valid response is parsed",
+      read_json_with(FakeResponse(good_url, b'{"tag_name": "v1.2.3"}'))
+      == {"tag_name": "v1.2.3"})
+check("a redirect that lands off GitHub is refused",
+      rejected(lambda: read_json_with(
+          FakeResponse("https://example.invalid/releases", b'{}')),
+          "unexpected update server"))
+check("an announced oversized body is refused before reading",
+      rejected(lambda: read_json_with(FakeResponse(
+          good_url, b'{}', {"Content-Length": str(install.MAX_API_BYTES + 1)})),
+          "too large"))
+check("an oversized body is refused after reading",
+      rejected(lambda: read_json_with(
+          FakeResponse(good_url, b'{"padding": "' + b"y" * install.MAX_API_BYTES + b'"}')),
+          "too large"))
+
+valid_file = {
+    "type": "file",
+    "encoding": "base64",
+    "content": base64.b64encode(new_content).decode(),
+}
+
+
+def release_feed(release: object, contents: object = None):
+    def fetch(url: str) -> object:
+        return release if url == install.LATEST_RELEASE_URL else (
+            valid_file if contents is None else contents
+        )
+    return fetch
+
+
+BAD_RELEASES = [
+    ("a non-object release response", release_feed([])),
+    ("a draft release", release_feed({"tag_name": "v9.8.7", "draft": True})),
+    ("a prerelease", release_feed({"tag_name": "v9.8.7", "prerelease": True})),
+    ("a release without a tag", release_feed({})),
+    ("an over-long tag", release_feed({"tag_name": "v" + "9" * 200})),
+    ("an unparsable tag", release_feed({"tag_name": "release-candidate"})),
+    ("a baseline that is not a file",
+     release_feed({"tag_name": "v9.8.7"}, {"type": "dir"})),
+    ("an unsupported encoding",
+     release_feed({"tag_name": "v9.8.7"}, {"type": "file", "encoding": "hex",
+                                           "content": "00"})),
+    ("content that is not base64",
+     release_feed({"tag_name": "v9.8.7"}, {"type": "file", "encoding": "base64",
+                                           "content": "not base64!"})),
+    ("a baseline with an unexpected heading",
+     release_feed({"tag_name": "v9.8.7"},
+                  {"type": "file", "encoding": "base64",
+                   "content": base64.b64encode(
+                       b"# Something else\n\n`baseline-id: aisec-9.8.7`\n").decode()})),
+]
+for label, feed in BAD_RELEASES:
+    check(f"the updater rejects {label}",
+          rejected(lambda feed=feed: install.fetch_release_baseline(feed)))
+
+
+class FakeHTTPError(urllib.error.HTTPError):
+    def __init__(self, code: int):
+        super().__init__(good_url, code, "error", {}, None)
+
+
+def available_with(error: Exception | None):
+    original = install.fetch_release_baseline
+
+    def failing(*_args, **_kwargs):
+        raise error
+
+    install.fetch_release_baseline = original if error is None else failing
+    try:
+        return install.latest_available(True)
+    finally:
+        install.fetch_release_baseline = original
+
+
+offline_baseline, offline_note = install.latest_available(False)
+check("an offline check uses the bundled baseline",
+      offline_baseline.digest == bundled.digest and "skipped" in offline_note)
+_, missing_note = available_with(FakeHTTPError(404))
+check("a repository without releases falls back to the bundled baseline",
+      "no published release" in missing_note, missing_note)
+for label, error in (("a server error", FakeHTTPError(500)),
+                     ("an unreachable host", OSError("no route")),
+                     ("an invalid payload", ValueError("bad json"))):
+    _, note = available_with(error)
+    check(f"{label} falls back to the bundled baseline",
+          "online check unavailable" in note, note)
+
+
+def newer_release(*_args, **_kwargs):
+    older = bundled.content.replace(bundled.baseline_id.encode(), b"aisec-0.0.1", 1)
+    return install.parse_baseline(older, "test release")
+
+
+original_fetch = install.fetch_release_baseline
+install.fetch_release_baseline = newer_release
+try:
+    kept, newer_note = install.latest_available(True)
+finally:
+    install.fetch_release_baseline = original_fetch
+check("a bundled baseline newer than the release wins",
+      kept.digest == bundled.digest and "newer than published" in newer_note,
+      newer_note)
+
+# --- placement refusals ----------------------------------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    link = root / install.BASELINE
+    link.symlink_to(root / "elsewhere.md")
+    report = []
+    check("a symlinked baseline is never written through",
+          install.place_baseline(root, report) is None
+          and any("is a symlink" in line for line in report), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    (root / install.BASELINE).mkdir()
+    report = []
+    check("a directory in the baseline's place is refused",
+          install.place_baseline(root, report) is None
+          and any("not a regular file" in line for line in report), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    missing = Path(tmp) / "absent"
+    report = []
+    check("a missing project directory is refused by default",
+          install.place_baseline(missing, report) is None
+          and any("does not exist" in line for line in report), str(report))
+    created = install.place_baseline(missing, report, create_root=True)
+    check("a missing directory is created only when asked",
+          created is not None and created.is_file())
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    hook = install.version_hook_path(root, None)
+    hook.parent.mkdir(parents=True)
+    hook.write_text("print('something else')\n", encoding="utf-8")
+    report = []
+    check("a foreign hook helper is never overwritten",
+          install._place_version_hook(root, None, report) is None
+          and any("different hook helper" in line for line in report), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    hook = install.version_hook_path(root, None)
+    hook.parent.mkdir(parents=True)
+    hook.symlink_to(root / "elsewhere.py")
+    report = []
+    check("a symlinked hook helper is refused",
+          install._place_version_hook(root, None, report) is None
+          and any("is a symlink" in line for line in report), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    hook = install.version_hook_path(root, None)
+    hook.mkdir(parents=True)
+    report = []
+    check("a directory in the hook helper's place is refused",
+          install._place_version_hook(root, None, report) is None
+          and any("not a regular file" in line for line in report), str(report))
+
+check("the current hook helper is listed as shipped",
+      hashlib.sha256(install.VERSION_HOOK_SOURCE.read_bytes()).hexdigest()
+      in install.KNOWN_HOOK_DIGESTS,
+      "append the new digest to KNOWN_HOOK_DIGESTS after changing the helper")
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    hook = install.version_hook_path(root, None)
+    hook.parent.mkdir(parents=True)
+    earlier = b"print('an earlier shipped hook helper')\n"
+    hook.write_bytes(earlier)
+    shipped = install.KNOWN_HOOK_DIGESTS
+    install.KNOWN_HOOK_DIGESTS = shipped + (hashlib.sha256(earlier).hexdigest(),)
+    report = []
+    placed = install._place_version_hook(root, None, report)
+    install.KNOWN_HOOK_DIGESTS = shipped
+    check("an unchanged earlier hook helper is replaced",
+          placed is not None
+          and hook.read_bytes() == install.VERSION_HOOK_SOURCE.read_bytes()
+          and any("updated" in line for line in report), str(report))
+
+# --- import rewriting ------------------------------------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    old, new = root / "old.md", root / "new.md"
+    target = root / "CLAUDE.md"
+    target.write_text(f"# notes\n@{old}\nkeep this\n", encoding="utf-8")
+    check("an import line is rewritten in place",
+          install._replace_import(target, old, new)
+          and target.read_text(encoding="utf-8") == f"# notes\n@{new}\nkeep this\n",
+          target.read_text(encoding="utf-8"))
+    check("rewriting again is a no-op that still reports success",
+          install._replace_import(target, old, new))
+    unrelated = root / "OTHER.md"
+    unrelated.write_text("# no import here\n", encoding="utf-8")
+    check("a file without the old import is left alone",
+          not install._replace_import(unrelated, old, new)
+          and unrelated.read_text(encoding="utf-8") == "# no import here\n")
+    missing = root / "absent.md"
+    check("a missing import target is refused",
+          not install._replace_import(missing, old, new))
+    symlinked = root / "linked.md"
+    symlinked.symlink_to(target)
+    check("a symlinked import target is refused",
+          not install._replace_import(symlinked, old, new))
+    binary = root / "binary.md"
+    binary.write_bytes(b"\xff\xfe\n")
+    check("an unreadable import target is refused",
+          not install._replace_import(binary, old, new))
+
+# --- discovery edge cases --------------------------------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    (root / ".github").mkdir()
+    manual = root / ".github" / "copilot-instructions.md"
+    manual.write_bytes(bundled.content)
+    found = install.scan_unmanaged_project_files(root)
+    check("a manually copied project instruction file is discovered",
+          len(found) == 1 and found[0].kind == "unmanaged"
+          and found[0].tools == ("copilot",), str(found))
+    check("an unmanaged file is never offered for automatic updates",
+          not found[0].has_update(bundled))
+    (root / "AGENTS.md").write_text("not a baseline\n", encoding="utf-8")
+    check("an unrelated instruction file is not mistaken for a baseline",
+          len(install.scan_unmanaged_project_files(root)) == 1)
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    install.install(["claude"], home, home)
+    broken = home / ".codex" / "AGENTS.md"
+    broken.parent.mkdir(parents=True, exist_ok=True)
+    broken.symlink_to(home / "gone.md")
+    found = install.scan_user(home, {})
+    check("a dangling user link is skipped rather than reported",
+          all(item.source.is_file() for item in found), str(found))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    claude_dir = home / ".claude"
+    claude_dir.mkdir()
+    copied = claude_dir / install.BASELINE
+    copied.write_bytes(bundled.content)
+    (claude_dir / "CLAUDE.md").write_text(f"@{copied}\n", encoding="utf-8")
+    found = [item for item in install.scan_user(home) if item.kind == "unmanaged"]
+    check("a copied Claude baseline is reported as an unmanaged file",
+          len(found) == 1 and found[0].tools == ("claude",), str(found))
+
+# --- update refusals -------------------------------------------------------
+
+customized = install.parse_baseline(
+    bundled.content.replace(b"`baseline-id: aisec-", b"`baseline-id: acme-", 1),
+    "custom",
+)
+custom_installation = install.Installation(
+    "project", Path("/nonexistent"), Path("/nonexistent/x.md"), customized, ("codex",)
+)
+report, updated = install.update_installation(
+    custom_installation, bundled, lambda _q, _d: True
+)
+check("a customized baseline is never replaced",
+      updated is None and any("customized" in line for line in report), str(report))
+
+unmanaged_installation = install.Installation(
+    "unmanaged", Path("/nonexistent"), Path("/nonexistent/x.md"), bundled, ("codex",)
+)
+report, updated = install.update_installation(
+    unmanaged_installation, bundled, lambda _q, _d: True
+)
+check("an unmanaged file is not updated in place",
+      updated is None and any("not managed" in line for line in report), str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    install.install(["codex"], root, None, content=old_content)
+    found = install.scan_project(root, {})
+    (root / install.BASELINE).write_bytes(bundled.content)
+    report, updated = install.update_installation(found, bundled, lambda _q, _d: True)
+    check("a source that changed since discovery is not overwritten",
+          updated is None
+          and any("changed since discovery" in line for line in report), str(report))
+
+# --- guided selection refusals ---------------------------------------------
+
+invalid_output: list[str] = []
+check("a repeatedly invalid tool selection cancels instead of guessing",
+      install.choose_tools(lambda _p: "nonsense", invalid_output.append,
+                           install.TOOLS) is None
+      and sum("Invalid selection" in line for line in invalid_output) == 3,
+      str(invalid_output))
+check("tools can be chosen by name",
+      install.choose_tools(lambda _p: "codex, claude", lambda _l: None,
+                           install.TOOLS) == ["codex", "claude"])
+check("the all keyword selects every tool",
+      install.choose_tools(lambda _p: "all", lambda _l: None,
+                           install.TOOLS) == list(install.TOOLS))
+hook_invalid: list[str] = []
+check("a repeatedly invalid hook selection skips the hooks",
+      install.choose_hook_tools(lambda _p: "nonsense", hook_invalid.append,
+                                list(install.TOOLS)) == []
+      and sum("Invalid selection" in line for line in hook_invalid) == 3,
+      str(hook_invalid))
+check("an over-long answer is refused",
+      rejected(lambda: install._read_answer(lambda _p: "x" * 4097, "? ")))
+check("yes/no falls back to the default after three invalid answers",
+      install.ask_yes_no(lambda _p: "maybe", "?", True) is True
+      and install.ask_yes_no(lambda _p: "maybe", "?", False) is False)
+
+# --- the command line ------------------------------------------------------
+#
+# main() reads Path.home() and writes a registry there, so every case below
+# runs as its own process with HOME pointing into a throwaway directory. That
+# also exercises the module's __main__ entry point.
+
+
+def cli(args: list[str], home: Path, cwd: Path | None = None):
+    environment = dict(os.environ, HOME=str(home))
+    environment.pop("XDG_CONFIG_HOME", None)
+    return subprocess.run(
+        [sys.executable, str(install.REPO / "scripts" / "install.py"), *args],
+        capture_output=True, text=True, timeout=60, env=environment,
+        cwd=str(cwd) if cwd else None, stdin=subprocess.DEVNULL,
+    )
+
+
+REJECTED_ARGUMENTS = [
+    ("an unknown tool", ["nonexistent-tool"]),
+    ("--offline without a mode", ["--offline"]),
+    ("--interactive with tools", ["--interactive", "codex"]),
+    ("--interactive with --user", ["--interactive", "--user"]),
+    ("--interactive with --status", ["--interactive", "--status"]),
+    ("--status with tools", ["--status", "codex"]),
+    ("--status with --user", ["--status", "--user"]),
+    ("--into on the filesystem root", ["codex", "--into", "/"]),
+]
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+
+    for label, args in REJECTED_ARGUMENTS:
+        completed = cli(args, home)
+        check(f"the command line refuses {label}",
+              completed.returncode == 2, completed.stderr[:200])
+
+    completed = cli(["codex", "--into", str(sandbox / "absent")], home)
+    check("the command line refuses a missing project directory",
+          completed.returncode == 2, completed.stderr[:200])
+
+    completed = cli(["--interactive"], home)
+    check("guided setup refuses to run without a terminal",
+          completed.returncode == 2 and "requires a terminal" in completed.stderr,
+          completed.stderr[:200])
+
+    completed = cli(["codex", "--into", str(project)], home)
+    check("a project install from the command line succeeds",
+          completed.returncode == 0 and (project / "AGENTS.md").is_symlink(),
+          completed.stderr[:200])
+    check("the command line records the installation for later updates",
+          install.registry_path(home).is_file(),
+          str(install.registry_path(home)))
+
+    completed = cli(["--status", "--offline", "--into", str(project)], home)
+    check("the status mode reports without changing anything",
+          completed.returncode == 0 and "status" in completed.stdout.lower(),
+          completed.stderr[:200])
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    completed = cli(["--user", "codex"], home)
+    check("a user install from the command line succeeds",
+          completed.returncode == 0
+          and (home / ".codex" / "AGENTS.md").is_symlink(),
+          completed.stderr[:200])
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+    state = install.registry_path(home)
+    state.parent.mkdir(parents=True)
+    state.write_text("not json\n", encoding="utf-8")
+    completed = cli(["codex", "--into", str(project)], home)
+    check("an invalid registry is reported but never overwritten",
+          completed.returncode == 0
+          and "registry is invalid" in completed.stderr
+          and state.read_text(encoding="utf-8") == "not json\n",
+          completed.stderr[:200])
+
+# --- version comparison ----------------------------------------------------
+
+check("prereleases sort before their stable release",
+      install.SemVer.parse("1.0.0-alpha") < install.SemVer.parse("1.0.0-beta")
+      < install.SemVer.parse("1.0.0"))
+check("a longer prerelease sorts after its prefix",
+      install.SemVer.parse("1.0.0-rc") < install.SemVer.parse("1.0.0-rc.1"))
+check("numeric prerelease parts sort before alphanumeric ones",
+      install.SemVer.parse("1.0.0-1") < install.SemVer.parse("1.0.0-alpha"))
+check("build metadata does not affect ordering or equality",
+      install.SemVer.parse("1.0.0+build.1") == install.SemVer.parse("1.0.0+build.2"))
+check("versions are not comparable to other types",
+      install.SemVer.parse("1.0.0").__lt__("1.0.0") is NotImplemented
+      and install.SemVer.parse("1.0.0").__eq__("1.0.0") is NotImplemented)
+
+# --- answers to path questions ---------------------------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp).resolve()
+    check("a bare tilde means the home directory",
+          install._path_from_answer("~", home) == home)
+    check("a tilde path is expanded below the home directory",
+          install._path_from_answer("~/projects", home) == home / "projects")
+    check("an absolute path is used as given",
+          install._path_from_answer(str(home / "x"), home) == home / "x")
+
+# --- instruction files that cannot be joined safely ------------------------
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    source = root / install.BASELINE
+    source.write_bytes(bundled.content)
+    unreadable = root / "CLAUDE.md"
+    unreadable.write_bytes(b"\xff\xfe\n")
+    report = []
+    install.install_import_line(unreadable, source, report)
+    check("an instruction file that is not UTF-8 is never appended to",
+          any("cannot safely read" in line for line in report)
+          and unreadable.read_bytes() == b"\xff\xfe\n", str(report))
+
+    broken = root / "BROKEN.md"
+    broken.symlink_to(root / "gone.md")
+    report = []
+    install.install_import_line(broken, source, report)
+    check("a broken instruction symlink is refused, not replaced",
+          any("broken symlink" in line for line in report)
+          and broken.is_symlink(), str(report))
+
+    foreign = root / "FOREIGN.md"
+    foreign.write_text("# someone else's instructions\n", encoding="utf-8")
+    report = []
+    install.install_import_line(foreign, source, report)
+    check("an existing instruction file keeps its content and names the manual step",
+          any("add the line" in line for line in report)
+          and foreign.read_text(encoding="utf-8") == "# someone else's instructions\n",
+          str(report))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    target = root / "partial.md"
+
+
+    class Unwritable:
+        """Not bytes-like, so the write fails once the file already exists."""
+
+    try:
+        install._write_new(target, Unwritable())
+    except TypeError:
+        pass
+    check("a write interrupted midway leaves no partial file behind",
+          not target.exists(), str(target))
+
 print(f"\ninstall: {'ok' if not failures else f'{failures} failures'}")
 sys.exit(1 if failures else 0)

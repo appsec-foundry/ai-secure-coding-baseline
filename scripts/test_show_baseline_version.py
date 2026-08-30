@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""Keep the session-start version hook honest.
+
+The hook runs in every agent session that installs it, reads a file the
+installer placed, and prints the result into the session.
+
+The helper finds the baseline relative to its own location, so the cases below
+move that location to a prepared directory instead of copying the helper: a
+copy would be a different file, and the coverage of the shipped one would stay
+at zero. One case runs the real script as a subprocess, which is how an agent
+invokes it.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import io
+import json
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+HELPER = REPO / "scripts" / "show_baseline_version.py"
+BASELINE = "secure-coding-baseline.md"
+MAX_BASELINE_BYTES = 256 * 1024
+
+sys.path.insert(0, str(HELPER.parent))
+import show_baseline_version as hook  # noqa: E402
+
+VALID_ID = "aisec-0.1.10"
+VALID = f"# AI Secure Coding Baseline\n\n`baseline-id: {VALID_ID}`\n\nRules follow.\n"
+
+# The installer may place the baseline beside the helper or one level above it.
+BESIDE = {"scripts/" + BASELINE: VALID}
+ABOVE = {BASELINE: VALID}
+
+READ_FAILURES = [
+    ("no baseline anywhere", {}),
+    ("empty baseline", {BASELINE: ""}),
+    ("no baseline ID", {BASELINE: "# Heading\n\nNo identifier here.\n"}),
+    ("two baseline IDs",
+     {BASELINE: f"`baseline-id: {VALID_ID}`\n\n`baseline-id: aisec-0.2.0`\n"}),
+    ("ID not at line start", {BASELINE: f"see `baseline-id: {VALID_ID}`\n"}),
+    ("malformed version", {BASELINE: "`baseline-id: aisec-1.2`\n"}),
+    ("leading zero in the version", {BASELINE: "`baseline-id: aisec-0.01.0`\n"}),
+    ("invalid UTF-8", {BASELINE: b"`baseline-id: aisec-0.1.10`\n\xff\xfe\n"}),
+    ("one byte over the size limit",
+     {BASELINE: VALID + "x" * (MAX_BASELINE_BYTES - len(VALID) + 1)}),
+    ("a symlinked baseline", {BASELINE: ("symlink", "elsewhere.md"),
+                              "elsewhere.md": VALID}),
+    ("a directory where the baseline belongs", {BASELINE + "/keep": ""}),
+]
+
+
+def build(layout: dict[str, object]) -> Path:
+    """Lay out the given files in a fresh directory that the helper will search."""
+    root = Path(tempfile.mkdtemp()).resolve()
+    (root / "scripts").mkdir()
+    for name, content in layout.items():
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(content, tuple):
+            target.symlink_to(root / content[1])
+        elif isinstance(content, bytes):
+            target.write_bytes(content)
+        else:
+            target.write_text(content, encoding="utf-8")
+    return root
+
+
+@contextlib.contextmanager
+def helper_in(root: Path):
+    """Pretend the helper was installed into the prepared directory."""
+    original = hook.__file__
+    hook.__file__ = str(root / "scripts" / HELPER.name)
+    try:
+        yield
+    finally:
+        hook.__file__ = original
+
+
+def call(layout: dict[str, object],
+         argv: list[str] | None = None) -> tuple[object, str, str]:
+    root = build(layout)
+    out, err = io.StringIO(), io.StringIO()
+    with helper_in(root), contextlib.redirect_stdout(out), \
+            contextlib.redirect_stderr(err):
+        try:
+            code: object = hook.main(argv or [])
+        except SystemExit as exc:  # argparse rejects unknown arguments this way
+            code = exc.code
+    return code, out.getvalue(), err.getvalue()
+
+
+def check_success(failures: list[str]) -> None:
+    """A readable baseline yields the ID, in both output formats."""
+    for label, layout in (("beside the helper", BESIDE), ("one level above", ABOVE)):
+        code, out, err = call(layout)
+        if code != 0:
+            failures.append(f"{label}: returned {code}: {err[:200]}")
+        elif VALID_ID not in out:
+            failures.append(f"{label}: banner lacks the ID: {out[:200]!r}")
+
+    code, out, err = call(ABOVE, ["--output", "json"])
+    if code != 0:
+        failures.append(f"json output: returned {code}: {err[:200]}")
+    else:
+        try:
+            payload = json.loads(out)
+        except json.JSONDecodeError as exc:
+            failures.append(f"json output is not JSON: {exc}")
+        else:
+            if VALID_ID not in payload.get("systemMessage", ""):
+                failures.append(f"json output lacks the ID: {payload}")
+
+    # The helper reads up to the limit, so the limit itself must still work.
+    at_limit = VALID + "x" * (MAX_BASELINE_BYTES - len(VALID))
+    code, out, _ = call({BASELINE: at_limit})
+    if code != 0 or VALID_ID not in out:
+        failures.append(
+            f"baseline at the size limit: returned {code}, stdout {out[:120]!r}"
+        )
+
+    # A baseline beside the helper wins over one above it, and nothing further
+    # up the tree is searched, so an unrelated baseline cannot be picked up.
+    code, out, _ = call({**ABOVE,
+                         "scripts/" + BASELINE: VALID.replace(VALID_ID, "aisec-9.9.9")})
+    if "aisec-9.9.9" not in out:
+        failures.append(f"baseline beside the helper must win: {out[:120]!r}")
+
+
+def check_failures(failures: list[str]) -> None:
+    """Every unreadable baseline fails closed, without leaking internals."""
+    for label, layout in READ_FAILURES:
+        code, out, err = call(layout)
+        if code != 1:
+            failures.append(f"{label}: expected 1, got {code} / stdout {out[:120]!r}")
+        if out.strip():
+            failures.append(f"{label}: wrote a banner anyway: {out[:120]!r}")
+        if "Traceback" in err or ".py" in err:
+            failures.append(f"{label}: leaked internals: {err[:200]!r}")
+
+
+def check_arguments(failures: list[str]) -> None:
+    """An unknown output format is rejected rather than guessed."""
+    code, out, _ = call(ABOVE, ["--output", "yaml"])
+    if code != 2:
+        failures.append(f"unknown format: expected 2, got {code}")
+    if VALID_ID in out:
+        failures.append("unknown format still printed the ID")
+
+
+def check_installed_script(failures: list[str]) -> None:
+    """The way an agent runs it: the real script, as its own process."""
+    for argv, check in (([], lambda text: VALID_ID in text),
+                        (["--output", "json"],
+                         lambda text: VALID_ID in json.loads(text)["systemMessage"])):
+        proc = subprocess.run([sys.executable, str(HELPER), *argv],
+                              capture_output=True, text=True, timeout=20)
+        if proc.returncode != 0:
+            failures.append(
+                f"installed script {argv}: exited {proc.returncode}: {proc.stderr[:200]}"
+            )
+            continue
+        try:
+            if not check(proc.stdout):
+                failures.append(f"installed script {argv}: {proc.stdout[:200]!r}")
+        except (json.JSONDecodeError, KeyError) as exc:
+            failures.append(f"installed script {argv}: unusable output: {exc}")
+
+
+def main() -> int:
+    failures: list[str] = []
+    check_success(failures)
+    check_failures(failures)
+    check_arguments(failures)
+    check_installed_script(failures)
+
+    for line in failures:
+        print(f"FAIL: {line}")
+    if failures:
+        return 1
+    print(f"version hook: ok ({len(READ_FAILURES)} read failures rejected)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
