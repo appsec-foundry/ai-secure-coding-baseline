@@ -21,9 +21,7 @@ Code plugin supports application-security work and can also manage this baseline
 > where supported, deterministic gates such as the optional
 > [`Claude Code gate`](examples/claude-code-gate/).
 
-The baseline is 20.2 KB and roughly 4,000 tokens, within its approximate
-4,100-token budget. It has been refined through AI-assisted coding tasks, not
-formally certified.
+At 20.2 KB, or roughly 4,000 tokens, the baseline stays within its approximate 4,100-token budget. It has been shaped through practical AI-assisted coding tasks, but it has not undergone formal certification.
 
 ## Quick start
 
