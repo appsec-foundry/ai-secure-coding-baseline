@@ -2,17 +2,25 @@
 # so the expensive targets run the free self-check before spending anything.
 
 .DEFAULT_GOAL := check
-.PHONY: check setup update status install install-claude install-codex install-copilot \
-        dry-run test test-all clean-results help
+.PHONY: check coverage setup update status install install-claude install-codex \
+        install-copilot dry-run test test-all clean-results help
+
+# Both check and coverage run this suite, so it is listed once.
+CHECK_TESTS = tests/selfcheck.py \
+              tests/test_selfcheck.py \
+              tests/test_run.py \
+              examples/claude-code-gate/test_gate.py \
+              scripts/test_spec_guard.py \
+              scripts/test_install.py
 
 ## check       validate the suite itself: no model calls, seconds
 check:
-	python3 tests/selfcheck.py
-	python3 tests/test_selfcheck.py
-	python3 tests/test_run.py
-	python3 examples/claude-code-gate/test_gate.py
-	python3 scripts/test_spec_guard.py
-	python3 scripts/test_install.py
+	@set -e; for t in $(CHECK_TESTS); do echo "python3 $$t"; python3 $$t; done
+
+## coverage    statement coverage of the check suite; needs the coverage package
+##             ARGS=--xml=coverage.xml also writes a report for CI upload
+coverage:
+	python3 scripts/coverage_report.py $(ARGS) $(CHECK_TESTS)
 
 ## setup       guided install and update; ARGS=--offline skips the release check
 setup:
