@@ -37,7 +37,7 @@ version of the setup script and verifies its SHA-256 before running it:
 curl --proto '=https' \
   --fail --silent --show-error \
   --output aiscb-setup.sh \
-  https://raw.githubusercontent.com/appsec-foundry/aiscb/015cc903ac16cd1acfb15afc74b63185b9a63e32/setup.sh &&
+  https://raw.githubusercontent.com/appsec-foundry/aiscb/4e1c9d7434af171c423491dbe71f0eca4350eeb3/setup.sh &&
 echo '3546f9af7679f169d010fc5c537f89ade539d49111ce75766e51ea3769cddb1f  aiscb-setup.sh' |
   sha256sum --check &&
 bash aiscb-setup.sh
