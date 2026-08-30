@@ -601,6 +601,31 @@ with tempfile.TemporaryDirectory() as tmp:
     home.mkdir()
     project.mkdir()
     install.install(list(install.TOOLS), home, home)
+    registry = install.empty_registry()
+    for item in install.scan_user(home, {}):
+        if item.kind == "user":
+            install.record_installation(registry, item, trusted=True)
+    state = sandbox / "state.json"
+    install.save_registry(state, registry)
+    prompts = []
+    install.interactive_setup(
+        home=home,
+        input_fn=lambda prompt: prompts.append(prompt) or "3",
+        output=lambda _line: None,
+        check_online=False,
+        state_path=state,
+        current_root=project,
+    )
+    check("a complete user scope defaults to leaving, not to writing a project",
+          prompts == ["Choice [3]: "], str(prompts))
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
+    install.install(list(install.TOOLS), home, home)
     install.install(list(install.TOOLS), project, None)
     registry = install.empty_registry()
     for item in install.scan_user(home, {}):
@@ -648,15 +673,17 @@ with tempfile.TemporaryDirectory() as tmp:
     prompts: list[str] = []
     result = install.interactive_setup(
         home=home,
-        input_fn=lambda prompt: prompts.append(prompt) or "",
+        input_fn=lambda prompt: prompts.append(prompt) or (
+            "1" if prompt.startswith("Choice") else ""
+        ),
         output=lambda _line: None,
         check_online=False,
         state_path=state,
         current_root=project,
     )
-    check("a user update defaults to the existing user scope and tools",
+    check("an update runs first, and the user scope keeps its tools",
           result == 0
-          and any(prompt == "Choice [1]: " for prompt in prompts)
+          and any(prompt == "Choice [3]: " for prompt in prompts)
           and any("keep installed (Codex)" in prompt for prompt in prompts)
           and (home / ".codex" / "AGENTS.md").is_symlink()
           and not (home / ".claude" / "rules").exists()

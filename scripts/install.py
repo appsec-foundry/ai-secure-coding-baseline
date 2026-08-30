@@ -2041,9 +2041,9 @@ def interactive_setup(
         output("  2. exit")
         valid_choices = {"1", "2"}
         exit_choice = "2"
-    # Nothing to install and nothing outstanding: leaving is the sensible default.
-    settled = user_installed and (project_root is None or current_installed)
-    default_choice = exit_choice if settled else "1"
+    # Offer the user-wide install while it is missing, and the exit once it is
+    # there. Pressing Enter must never write into whatever directory this runs in.
+    default_choice = exit_choice if user_installed else "1"
     choice = ""
     for _ in range(3):
         choice = _read_answer(input_fn, f"Choice [{default_choice}]: ") or default_choice
