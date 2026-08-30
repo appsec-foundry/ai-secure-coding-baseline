@@ -590,9 +590,9 @@ with tempfile.TemporaryDirectory() as tmp:
         state_path=sandbox / "state.json",
         current_root=project,
     )
-    legend = [line for line in output if line.startswith("  ✓ current")]
+    legend = [line for line in output if line.startswith("  ✓ up to date")]
     check("a mixed table explains only the symbols it uses",
-          legend == ["  ✓ current  ↻ update available"], str(output[:12]))
+          legend == ["  ✓ up to date  ↻ update available"], str(output[:12]))
 
 with tempfile.TemporaryDirectory() as tmp:
     sandbox = Path(tmp)
@@ -622,7 +622,7 @@ with tempfile.TemporaryDirectory() as tmp:
         current_root=project,
     )
     check("a table of one condition needs no legend",
-          not any("current" in line and "not installed" in line
+          not any("up to date" in line and "not installed" in line
                   for line in output), str(output[:12]))
     check("a setup with nothing left to do defaults to leaving",
           result == 0

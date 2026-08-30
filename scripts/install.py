@@ -1522,8 +1522,8 @@ def _installation_state(installation: Installation, available: Baseline) -> str:
     if installation.baseline.version > available.version:
         return "newer than available"
     if installation.kind == "legacy-user":
-        return "current, migration recommended"
-    return "current"
+        return "up to date, migration recommended"
+    return "up to date"
 
 
 def _installation_symbol(installation: Installation, available: Baseline) -> str:
@@ -1635,7 +1635,7 @@ def _show_setup_status(
     legend = [
         f"{symbol} {meaning}"
         for symbol, meaning in (
-            ("✓", "current"),
+            ("✓", "up to date"),
             ("↻", "update available"),
             ("•", "review needed"),
             ("-", "not installed"),
