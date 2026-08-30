@@ -20,12 +20,23 @@ from functools import total_ordering
 from pathlib import Path
 from typing import Callable
 
-REPO = Path(__file__).resolve().parent.parent
 BASELINE = "secure-coding-baseline.md"
-SOURCE = REPO / BASELINE
-VERSION_HOOK_SOURCE = REPO / "scripts" / "show_baseline_version.py"
 VERSION_HOOK_DIR = ".ai-secure-coding-baseline"
 VERSION_HOOK_NAME = "show-baseline-version.py"
+INSTALLER_NAME = "install.py"
+INSTALLER_SOURCE = Path(__file__).resolve()
+# A checkout and the remote bundle keep this file in scripts/, with the baseline
+# one level above. The copy placed beside an installed baseline sits next to it,
+# so an update needs no checkout.
+if INSTALLER_SOURCE.parent.name == "scripts":
+    REPO = INSTALLER_SOURCE.parent.parent
+    VERSION_HOOK_SOURCE = INSTALLER_SOURCE.parent / "show_baseline_version.py"
+    LOCAL_ORIGIN = "bundled checkout"
+else:
+    REPO = INSTALLER_SOURCE.parent
+    VERSION_HOOK_SOURCE = REPO / VERSION_HOOK_NAME
+    LOCAL_ORIGIN = "installed copy"
+SOURCE = REPO / BASELINE
 # SHA-256 of every hook helper this installer has shipped, the current one last.
 # Only an unchanged copy of one of these is replaced, so edited or foreign code
 # in that place survives. Append the new digest whenever the helper changes.
@@ -52,6 +63,7 @@ API_VERSION = "2026-03-10"
 ONLINE_TIMEOUT = 4
 MAX_BASELINE_BYTES = 256 * 1024
 MAX_INSTRUCTION_BYTES = 512 * 1024
+MAX_INSTALLER_BYTES = 512 * 1024
 MAX_API_BYTES = 512 * 1024
 MAX_REGISTRY_BYTES = 128 * 1024
 MAX_HOOK_CONFIG_BYTES = 128 * 1024
@@ -233,7 +245,7 @@ def read_baseline(path: Path) -> Baseline:
 
 
 def bundled_baseline() -> Baseline:
-    return parse_baseline(read_limited(SOURCE, MAX_BASELINE_BYTES), "bundled checkout")
+    return parse_baseline(read_limited(SOURCE, MAX_BASELINE_BYTES), LOCAL_ORIGIN)
 
 
 class _GitHubRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -501,6 +513,9 @@ def install(
         relative = True
     if source is None:
         return report
+    if home is not None:
+        _place_installer(home, report)
+        _place_version_hook(root, home, report)
 
     for tool in tools:
         actions = targets[tool]
@@ -524,6 +539,41 @@ def install(
     return report
 
 
+def _place_installer(home: Path, report: list[str]) -> Path | None:
+    """Keep a runnable installer beside the baseline, so updates need no checkout."""
+    target = user_data_root(home) / INSTALLER_NAME
+    if target == INSTALLER_SOURCE:
+        report.append(f"in place {target}")
+        return target
+    content = read_limited(INSTALLER_SOURCE, MAX_INSTALLER_BYTES)
+    if target.is_symlink():
+        report.append(f"blocked {target}: is a symlink")
+        return None
+    if target.exists():
+        if not target.is_file():
+            report.append(f"blocked {target}: is not a regular file")
+            return None
+        try:
+            current = read_limited(target, MAX_INSTALLER_BYTES)
+        except (OSError, ValueError):
+            report.append(f"blocked {target}: cannot safely read existing installer")
+            return None
+        if current == content:
+            report.append(f"in place {target}")
+            return target
+        try:
+            _atomic_replace(target, content)
+        except OSError:
+            report.append(f"blocked {target}: cannot replace the installer")
+            return None
+        report.append(f"updated {target}")
+        return target
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _write_new(target, content)
+    report.append(f"added {target}")
+    return target
+
+
 def version_hook_path(root: Path, home: Path | None) -> Path:
     if home is not None:
         return user_data_root(home) / VERSION_HOOK_NAME
@@ -532,7 +582,11 @@ def version_hook_path(root: Path, home: Path | None) -> Path:
 
 def _place_version_hook(root: Path, home: Path | None, report: list[str]) -> Path | None:
     target = version_hook_path(root, home)
-    content = read_limited(VERSION_HOOK_SOURCE, MAX_BASELINE_BYTES)
+    try:
+        content = read_limited(VERSION_HOOK_SOURCE, MAX_BASELINE_BYTES)
+    except (OSError, ValueError):
+        report.append(f"blocked {target}: the hook helper source is missing")
+        return None
     if target.is_symlink():
         report.append(f"blocked {target}: is a symlink")
         return None

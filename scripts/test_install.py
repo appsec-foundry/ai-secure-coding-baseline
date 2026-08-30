@@ -1084,6 +1084,55 @@ with tempfile.TemporaryDirectory() as tmp:
           and hook.read_bytes() == install.VERSION_HOOK_SOURCE.read_bytes()
           and any("updated" in line for line in report), str(report))
 
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    shipped_source = install.VERSION_HOOK_SOURCE
+    install.VERSION_HOOK_SOURCE = root / "absent.py"
+    report = []
+    placed = install._place_version_hook(root, None, report)
+    install.VERSION_HOOK_SOURCE = shipped_source
+    check("a missing hook helper source is reported, not raised",
+          placed is None
+          and any("hook helper source is missing" in line for line in report),
+          str(report))
+
+# --- the installer copy that makes updates work without a checkout ---------
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    report = install.install(["claude"], home, home)
+    placed = install.user_data_root(home) / install.INSTALLER_NAME
+    check("a user install places the installer beside the baseline",
+          placed.is_file()
+          and placed.read_bytes() == install.INSTALLER_SOURCE.read_bytes(),
+          str(report))
+    environment = dict(os.environ, HOME=str(home))
+    environment.pop("XDG_CONFIG_HOME", None)
+    standalone = subprocess.run(
+        [sys.executable, str(placed), "--status", "--offline"],
+        capture_output=True, text=True, timeout=60, env=environment,
+        cwd=str(home), stdin=subprocess.DEVNULL,
+    )
+    check("the placed installer reports status without a checkout",
+          standalone.returncode == 0 and "installed copy" in standalone.stdout,
+          standalone.stderr or standalone.stdout)
+    placed.write_bytes(b"# an outdated installer copy\n")
+    again = install.install(["claude"], home, home)
+    check("an outdated installer copy is replaced",
+          placed.read_bytes() == install.INSTALLER_SOURCE.read_bytes()
+          and any(line.startswith("updated") and install.INSTALLER_NAME in line
+                  for line in again), str(again))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    placed = install.user_data_root(home) / install.INSTALLER_NAME
+    placed.parent.mkdir(parents=True)
+    placed.symlink_to(home / "elsewhere.py")
+    report = install.install(["claude"], home, home)
+    check("a symlinked installer copy is refused",
+          any("is a symlink" in line and install.INSTALLER_NAME in line
+              for line in report), str(report))
+
 # --- import rewriting ------------------------------------------------------
 
 with tempfile.TemporaryDirectory() as tmp:

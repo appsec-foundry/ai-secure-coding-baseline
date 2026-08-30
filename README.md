@@ -213,6 +213,20 @@ Use the pinned and verified command in the [Quick start](#quick-start). It
 requires Bash, `curl`, `sha256sum`, and Python 3. The downloaded
 `aisec-setup.sh` remains available for inspection or deletion.
 
+### Later updates without a checkout
+
+A user-level install keeps a runnable installer beside the managed baseline, so
+later checks and updates need neither a clone nor the remote bootstrap:
+
+```bash
+python3 ~/.local/share/ai-secure-coding-baseline/install.py --status
+python3 ~/.local/share/ai-secure-coding-baseline/install.py --interactive
+```
+
+That copy updates the baseline. Changes to the installer or the startup hook
+helper reach it only through the [Quick start](#quick-start) command or a
+clone.
+
 ### From a repository clone
 
 Run:
