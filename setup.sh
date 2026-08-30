@@ -21,37 +21,17 @@ command -v python3 >/dev/null 2>&1 || {
     echo "python3 is required for setup." >&2
     exit 1
 }
+command -v sha256sum >/dev/null 2>&1 || {
+    echo "sha256sum is required for verified setup." >&2
+    exit 1
+}
 
-api_url="https://api.github.com/repos/appsec-foundry/aiscb/branches/main"
-source_ref=$(
-    curl --proto '=https' \
-        --fail --silent --show-error --max-time 15 "$api_url" |
-        python3 -c '
-import json
-import re
-import sys
-
-try:
-    payload = json.load(sys.stdin)
-except ValueError:
-    raise SystemExit("GitHub did not return a readable answer")
-commit = payload.get("commit") if isinstance(payload, dict) else None
-sha = commit.get("sha") if isinstance(commit, dict) else None
-if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
-    raise SystemExit("GitHub did not return a valid main commit")
-print(sha)
-'
-)
-case "$source_ref" in
-    *[!0-9a-f]* | "")
-        echo "GitHub returned an invalid main commit SHA." >&2
-        exit 2
-        ;;
-esac
-if [ "${#source_ref}" -ne 40 ]; then
-    echo "GitHub returned an invalid main commit SHA." >&2
-    exit 2
-fi
+# This tag is never moved or reused. The hashes keep a moved or corrupted tag
+# from changing what this reviewed bootstrap executes.
+bundle_ref="aiscb-bundle-0.1.10-1"
+baseline_sha="1d01542b50d29e649c56ba6d9ea896aa7988b9eb6af1b08f633cfa9d2361e5b6"
+installer_sha="90eb898235389ee34e92dc62b2755b8d0c940521729a41a78e8d4b8c01901239"
+helper_sha="768746c35676ebf701e7c43fce26ff000dd1f4754e7e060f6f280510e1cd0033"
 
 setup_tmp=$(mktemp -d "${TMPDIR:-/tmp}/aiscb-setup.XXXXXX")
 cleanup() {
@@ -62,15 +42,29 @@ cleanup() {
 trap cleanup 0 1 2 3 15
 mkdir -p "$setup_tmp/scripts"
 
-source_root="https://raw.githubusercontent.com/appsec-foundry/aiscb/$source_ref"
+source_root="https://raw.githubusercontent.com/appsec-foundry/aiscb/$bundle_ref"
 download() {
+    bundle_path=$1
+    expected_sha=$2
+    max_bytes=$3
+    destination="$setup_tmp/$bundle_path"
     curl --proto '=https' \
-        --fail --silent --show-error --max-time 30 \
-        --output "$setup_tmp/$1" "$source_root/$1"
+        --fail --silent --show-error --max-time 30 --max-filesize "$max_bytes" \
+        --output "$destination" "$source_root/$bundle_path"
+    actual_size=$(wc -c < "$destination")
+    if [ "$actual_size" -gt "$max_bytes" ]; then
+        echo "Downloaded $bundle_path exceeds its size limit." >&2
+        exit 2
+    fi
+    if ! printf '%s  %s\n' "$expected_sha" "$destination" |
+        sha256sum --check >/dev/null 2>&1; then
+        echo "Integrity check failed for $bundle_path." >&2
+        exit 2
+    fi
 }
 
-download secure-coding-baseline.md
-download scripts/install.py
-download scripts/show_baseline_version.py
+download secure-coding-baseline.md "$baseline_sha" 262144
+download scripts/install.py "$installer_sha" 524288
+download scripts/show_baseline_version.py "$helper_sha" 262144
 
-python3 "$setup_tmp/scripts/install.py" --interactive "$@"
+python3 "$setup_tmp/scripts/install.py" --interactive --offline "$@"

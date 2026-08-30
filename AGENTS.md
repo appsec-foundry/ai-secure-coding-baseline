@@ -65,13 +65,28 @@ contract: `AGENTS.md` must require agents to read and follow the baseline
 through the reference above, must not carry a generated copy of it, and
 `CLAUDE.md` must import both files exactly once.
 
-The remote quick start treats `setup.sh` as a content-pinned bootstrap. Whenever
-`setup.sh` changes, recompute its SHA-256 and update the inline value in
-`README.md`; `scripts/test_install.py` enforces that match. When the download URL
-is pinned to a bootstrap commit rather than `main`, it must name the commit that
-contains that exact `setup.sh`, and a changed bootstrap requires both a new
-commit reference and a new SHA-256. Because the commit is only known after it is
-created, make that URL update in a follow-up documentation commit.
+The remote quick start is a two-level verified distribution path. `README.md`
+pins and hashes `setup.sh`; remote `setup.sh` pins one versioned bundle and
+checks the size and SHA-256 of `secure-coding-baseline.md`,
+`scripts/install.py`, and `scripts/show_baseline_version.py` before executing
+anything from it. Remote setup must install that checked bundle without
+substituting content fetched from `main` or a release at runtime. An installed
+copy may report a newer release, but verified updates run through the current
+Quick start rather than applying network-fetched instructions itself.
+
+Whenever any of the three bundled files changes, create a new bundle tag; never
+move or reuse a published bundle tag. Recompute every bundle hash in `setup.sh`
+from the exact commit the tag names, retain download size limits, and update the
+tests that identify the bundle. The release sequence is: commit and check the
+bundle files, create the bundle tag on that commit, then change `setup.sh` to
+the new tag and hashes. A documentation-only commit does not need a new bundle.
+
+Whenever `setup.sh` changes, recompute its SHA-256 and update the inline value in
+`README.md`; `scripts/test_install.py` enforces that match. The download URL must
+name the commit that contains that exact `setup.sh`. Because that commit is only
+known after it is created, commit the bootstrap first and update its URL in a
+follow-up documentation commit. Do not publish or merge the intermediate state
+where the README hash and bootstrap commit do not yet form a working pair.
 
 `make test` and `make test-all` are a different matter: they run the cases
 against real models. The full matrix is 60 runs and several hours of tokens.

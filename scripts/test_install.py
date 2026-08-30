@@ -1047,6 +1047,7 @@ with tempfile.TemporaryDirectory() as tmp:
           found is not None and found.has_update(bundled))
 
 setup_script = install.REPO / "setup.sh"
+setup_content = setup_script.read_text(encoding="utf-8")
 setup_digest = hashlib.sha256(setup_script.read_bytes()).hexdigest()
 readme = (install.REPO / "README.md").read_text(encoding="utf-8")
 quick_start = readme.split("## Quick start", 1)[1].split("\n## ", 1)[0]
@@ -1054,6 +1055,22 @@ normalized_quick_start = " ".join(quick_start.split())
 check("the quick start pins the exact remote bootstrap content",
       f"echo '{setup_digest} aiscb-setup.sh' | sha256sum --check"
       in normalized_quick_start)
+bundle_hashes = {
+    install.BASELINE: hashlib.sha256(install.SOURCE.read_bytes()).hexdigest(),
+    "scripts/install.py": hashlib.sha256(
+        install.INSTALLER_SOURCE.read_bytes()
+    ).hexdigest(),
+    "scripts/show_baseline_version.py": hashlib.sha256(
+        install.VERSION_HOOK_SOURCE.read_bytes()
+    ).hexdigest(),
+}
+check("the remote bootstrap pins and hashes one coherent bundle",
+      "bundle_ref=\"aiscb-bundle-0.1.10-1\"" in setup_content
+      and "/branches/main" not in setup_content
+      and all(digest in setup_content for digest in bundle_hashes.values())
+      and "--interactive --offline" in setup_content
+      and setup_content.count("--max-filesize") == 1,
+      setup_content)
 completed = subprocess.run(
     ["bash", str(setup_script), "--help"],
     capture_output=True,
@@ -1082,17 +1099,21 @@ with tempfile.TemporaryDirectory() as tmp:
         "while [ \"$#\" -gt 0 ]; do\n"
         "  case \"$1\" in\n"
         "    --output) output=$2; shift 2 ;;\n"
-        "    --proto|--max-time) shift 2 ;;\n"
+        "    --proto|--max-time|--max-filesize) shift 2 ;;\n"
         "    --fail|--silent|--show-error) shift ;;\n"
         "    *) url=$1; shift ;;\n"
         "  esac\n"
         "done\n"
         "case \"$url\" in\n"
-        "  */branches/main)\n"
-        "    printf '{\"commit\":{\"sha\":\"%s\"}}\\n' \"$AISCB_TEST_REF\" ;;\n"
         "  */\"$AISCB_TEST_REF\"/*)\n"
         "    path=${url#*\"$AISCB_TEST_REF\"/}\n"
-        "    cp \"$AISCB_TEST_REPO/$path\" \"$output\" ;;\n"
+        "    cp \"$AISCB_TEST_REPO/$path\" \"$output\"\n"
+        "    if [ \"${AISCB_TEST_TAMPER:-}\" = \"$path\" ]; then\n"
+        "      printf '\\nchanged\\n' >> \"$output\"\n"
+        "    fi\n"
+        "    if [ \"${AISCB_TEST_OVERSIZE:-}\" = \"$path\" ]; then\n"
+        "      dd if=/dev/zero bs=1024 count=513 >> \"$output\" 2>/dev/null\n"
+        "    fi ;;\n"
         "  *)\n"
         "    echo \"unexpected URL: $url\" >&2; exit 1 ;;\n"
         "esac\n",
@@ -1101,7 +1122,7 @@ with tempfile.TemporaryDirectory() as tmp:
     mock_curl.chmod(0o755)
     environment = os.environ.copy()
     environment["PATH"] = f"{mock_bin}{os.pathsep}{environment['PATH']}"
-    environment["AISCB_TEST_REF"] = "a" * 40
+    environment["AISCB_TEST_REF"] = "aiscb-bundle-0.1.10-1"
     environment["AISCB_TEST_REPO"] = str(install.REPO)
     remote = subprocess.run(
         ["sh", str(remote_setup), "--help"],
@@ -1110,9 +1131,35 @@ with tempfile.TemporaryDirectory() as tmp:
         cwd=sandbox,
         env=environment,
     )
-    check("setup.sh bootstraps a commit-pinned installer without a checkout",
+    check("setup.sh bootstraps a hash-pinned bundle without a checkout",
           remote.returncode == 0 and "usage: install.py" in remote.stdout,
           remote.stderr or remote.stdout)
+    tampered_environment = environment.copy()
+    tampered_environment["AISCB_TEST_TAMPER"] = "scripts/install.py"
+    tampered = subprocess.run(
+        ["sh", str(remote_setup), "--help"],
+        capture_output=True,
+        text=True,
+        cwd=sandbox,
+        env=tampered_environment,
+    )
+    check("setup.sh refuses a bundle file whose hash changed",
+          tampered.returncode == 2
+          and "Integrity check failed for scripts/install.py" in tampered.stderr,
+          tampered.stderr or tampered.stdout)
+    oversized_environment = environment.copy()
+    oversized_environment["AISCB_TEST_OVERSIZE"] = "scripts/install.py"
+    oversized = subprocess.run(
+        ["sh", str(remote_setup), "--help"],
+        capture_output=True,
+        text=True,
+        cwd=sandbox,
+        env=oversized_environment,
+    )
+    check("setup.sh refuses a bundle file over its size limit",
+          oversized.returncode == 2
+          and "exceeds its size limit" in oversized.stderr,
+          oversized.stderr or oversized.stdout)
 
 # --- update server ---------------------------------------------------------
 #

@@ -28,15 +28,16 @@ formally certified.
 ## Quick start
 
 The guided installer is the recommended way to install or update the baseline.
-To run it without a repository checkout, the command below downloads a fixed
-version of the setup script and verifies its SHA-256 before running it:
+Without a checkout, the command below verifies a fixed setup script. That
+bootstrap then downloads one versioned bundle and checks the size and SHA-256
+of the baseline, installer, and startup-hook helper before running them:
 
 ```bash
 curl --proto '=https' \
   --fail --silent --show-error \
   --output aiscb-setup.sh \
   https://raw.githubusercontent.com/appsec-foundry/aiscb/4e1c9d7434af171c423491dbe71f0eca4350eeb3/setup.sh &&
-echo '3546f9af7679f169d010fc5c537f89ade539d49111ce75766e51ea3769cddb1f  aiscb-setup.sh' |
+echo '65586cc4ac3409c1408d2286408730c7572ef0c96ecf6f7b67cdb8623d21b0a3  aiscb-setup.sh' |
   sha256sum --check &&
 bash aiscb-setup.sh
 ```
@@ -208,22 +209,24 @@ possible, and copy it only when necessary.
 ### Remote setup (no checkout)
 
 Use the pinned and verified command in the [Quick start](#quick-start). It
-requires Bash, `curl`, `sha256sum`, and Python 3. The downloaded
-`aiscb-setup.sh` remains available for inspection or deletion.
+requires Bash, `curl`, `sha256sum`, and Python 3.10 or newer. The downloaded
+`aiscb-setup.sh` remains available for inspection or deletion and stays pinned
+to its original bundle if it is run again later.
 
 ### Later updates without a checkout
 
-A user-level install keeps a runnable installer beside the managed baseline, so
-later checks and updates need neither a clone nor the remote bootstrap:
+A user-level install keeps a runnable installer beside the managed baseline for
+status checks and changes to the tools using the current verified bundle:
 
 ```bash
 python3 ~/.local/share/aiscb/install.py --status
 python3 ~/.local/share/aiscb/install.py --interactive
 ```
 
-That copy updates the baseline. Changes to the installer or the startup hook
-helper reach it only through the [Quick start](#quick-start) command or a
-clone.
+That copy does not install baseline content fetched at runtime. For a verified
+baseline, installer, or startup-hook update, run the current
+[Quick start](#quick-start) command again, or install the baseline from a
+reviewed clone with `ARGS=--offline`.
 
 ### From a repository clone
 
@@ -261,14 +264,16 @@ while ambiguous ones remain unchanged. Codex may require review through
 
 Once a hook is configured, setup asks whether it may look for new releases.
 The default is no, and the hook itself never makes a request: it reports what
-the last setup or status run found, together with the local update command.
+the last setup or status run found and points to the current verified Quick
+start.
 Answering yes lets a separate background process contact `api.github.com` at
 most once a day, which never delays a session.
 
-The installer uses the latest published release when available, otherwise the
-checkout copy. `ARGS=--offline` skips the release check. Replacing a locally
-edited managed baseline requires confirmation and creates a backup. The same
-detection runs with `make status`, which changes no installation.
+From a checkout, the installer uses the latest published release when available,
+otherwise the checkout copy. Remote setup and an installed user copy use their
+verified bundle instead. `ARGS=--offline` skips the release check. Replacing a
+locally edited managed baseline requires confirmation and creates a backup. The
+same detection runs with `make status`, which changes no installation.
 
 ### Claude Code
 
