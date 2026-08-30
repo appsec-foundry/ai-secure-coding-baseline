@@ -577,6 +577,39 @@ with tempfile.TemporaryDirectory() as tmp:
     project = sandbox / "project"
     home.mkdir()
     project.mkdir()
+    install.install(list(install.TOOLS), home, home)
+    install.install(list(install.TOOLS), project, None)
+    registry = install.empty_registry()
+    for item in install.scan_user(home, {}):
+        if item.kind == "user":
+            install.record_installation(registry, item, trusted=True)
+    install.record_installation(
+        registry, install.scan_project(project, {}), trusted=True
+    )
+    state = sandbox / "state.json"
+    install.save_registry(state, registry)
+    prompts = []
+    output = []
+    result = install.interactive_setup(
+        home=home,
+        input_fn=lambda prompt: prompts.append(prompt) or "",
+        output=output.append,
+        check_online=False,
+        state_path=state,
+        current_root=project,
+    )
+    check("a setup with nothing left to do defaults to leaving",
+          result == 0
+          and prompts == ["Choice [3]: "]
+          and output[-1] == "No changes made.",
+          f"prompts={prompts!r}, last={output[-1]!r}")
+
+with tempfile.TemporaryDirectory() as tmp:
+    sandbox = Path(tmp)
+    home = sandbox / "home"
+    project = sandbox / "project"
+    home.mkdir()
+    project.mkdir()
     old_content = bundled.content.replace(
         bundled.baseline_id.encode(), b"aiscb-0.0.1", 1
     )

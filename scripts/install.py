@@ -2028,9 +2028,12 @@ def interactive_setup(
         output("  2. exit")
         valid_choices = {"1", "2"}
         exit_choice = "2"
+    # Nothing to install and nothing outstanding: leaving is the sensible default.
+    settled = user_installed and (project_root is None or current_installed)
+    default_choice = exit_choice if settled else "1"
     choice = ""
     for _ in range(3):
-        choice = _read_answer(input_fn, "Choice [1]: ") or "1"
+        choice = _read_answer(input_fn, f"Choice [{default_choice}]: ") or default_choice
         if choice in valid_choices:
             break
         output(f"Invalid selection. Choose {', '.join(sorted(valid_choices))}.")
