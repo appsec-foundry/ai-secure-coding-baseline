@@ -26,6 +26,12 @@ SOURCE = REPO / BASELINE
 VERSION_HOOK_SOURCE = REPO / "scripts" / "show_baseline_version.py"
 VERSION_HOOK_DIR = ".ai-secure-coding-baseline"
 VERSION_HOOK_NAME = "show-baseline-version.py"
+# SHA-256 of every hook helper this installer has shipped, the current one last.
+# Only an unchanged copy of one of these is replaced, so edited or foreign code
+# in that place survives. Append the new digest whenever the helper changes.
+KNOWN_HOOK_DIGESTS = (
+    "b43737769f40c85ff056e6e237b7b3035a1617eddf9a4269b92c8bd8ba78b182",
+)
 COPILOT_VERSION_HOOK_NAME = "aisec-baseline-version.json"
 TOOLS = ("claude", "codex", "copilot")
 TOOL_LABELS = {
@@ -540,8 +546,16 @@ def _place_version_hook(root: Path, home: Path | None, report: list[str]) -> Pat
             report.append(f"blocked {target}: cannot safely read existing hook helper")
             return None
         if current != content:
-            report.append(f"blocked {target}: contains different hook helper code")
-            return None
+            if hashlib.sha256(current).hexdigest() not in KNOWN_HOOK_DIGESTS:
+                report.append(f"blocked {target}: contains different hook helper code")
+                return None
+            try:
+                _atomic_replace(target, content)
+            except OSError:
+                report.append(f"blocked {target}: cannot replace the hook helper")
+                return None
+            report.append(f"updated {target}")
+            return target
         report.append(f"in place {target}")
         return target
     target.parent.mkdir(parents=True, exist_ok=True)
