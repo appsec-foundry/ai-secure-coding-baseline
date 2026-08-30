@@ -197,7 +197,7 @@ class Installation:
         if self.kind == "user":
             return "user-wide"
         if self.kind == "legacy-user":
-            return f"user-wide (linked to checkout {display_path(self.source.parent)})"
+            return f"user-wide (linked to {display_path(self.source.parent)})"
         return f"unmanaged file {display_path(self.source)}"
 
     def has_update(self, available: Baseline) -> bool:
@@ -1372,7 +1372,10 @@ def _read_answer(input_fn: Callable[[str], str], prompt: str) -> str:
 
 
 def ask_yes_no(
-    input_fn: Callable[[str], str], question: str, default: bool
+    input_fn: Callable[[str], str],
+    question: str,
+    default: bool,
+    output: Callable[[str], None] = print,
 ) -> bool:
     suffix = " [Y/n] " if default else " [y/N] "
     for _ in range(3):
@@ -1383,6 +1386,7 @@ def ask_yes_no(
             return True
         if answer in {"n", "no"}:
             return False
+        output("Please answer yes or no.")
     return default
 
 
@@ -1445,7 +1449,7 @@ def choose_hook_tools(
     tools: list[str],
 ) -> list[str]:
     output("\nStartup hook:")
-    output("Show the active baseline and version for the selected installation:")
+    output("Shows the active baseline ID at the start of each session:")
     for number, tool in enumerate(tools, 1):
         output(f"  {number}. {TOOL_LABELS[tool]}")
     for _ in range(3):
@@ -1677,13 +1681,13 @@ def _review_updates(
                 f"\nReplace the differing {installation.baseline.baseline_id} content "
                 f"in {installation.label} with the available copy?"
             )
-        if not ask_yes_no(input_fn, question, True):
+        if not ask_yes_no(input_fn, question, True, output):
             output(f"  kept {installation.label} unchanged")
             continue
         report, updated = update_installation(
             installation,
             available,
-            lambda prompt, default: ask_yes_no(input_fn, prompt, default),
+            lambda prompt, default: ask_yes_no(input_fn, prompt, default, output),
         )
         for line in report:
             output(f"  {line}")
@@ -1731,18 +1735,19 @@ def _offer_update_check(
     output: Callable[[str], None],
 ) -> None:
     """Ask whether the startup hook may look up new releases in the background."""
+    output("\nThe hook can also name a newer release when one exists.")
     output(
-        "\nThe startup hook can report that a newer baseline was released. Finding "
-        "that out contacts api.github.com once a day, in a separate process that "
-        "never delays a session. Without it the hook reports what the last setup "
-        "or status run saw."
+        "Finding that out contacts api.github.com once a day, in a background "
+        "process that never delays a session."
     )
+    output("Without it, the hook reports what the last setup or status run saw.")
     section = registry.get(UPDATE_CHECK_KEY)
     section = section if isinstance(section, dict) else {}
     enabled = ask_yes_no(
         input_fn,
         "Check for new releases in the background?",
         update_check_enabled(registry),
+        output,
     )
     registry[UPDATE_CHECK_KEY] = {**section, "enabled": enabled}
 
@@ -1882,7 +1887,7 @@ def _install_user_interactively(
     migration_question = (
         f"Switch to a managed copy of {available.baseline_id}, so updates reach it?"
     )
-    if legacy and ask_yes_no(input_fn, migration_question, True):
+    if legacy and ask_yes_no(input_fn, migration_question, True, output):
         for installation in legacy:
             reviewed_updates.add(_update_key(installation))
             report, migrated = migrate_legacy_user(installation, available)
@@ -2150,7 +2155,10 @@ def main(argv: list[str] | None = None) -> int:
                 "--interactive cannot be combined with tools, --user, or --status"
             )
         if not sys.stdin.isatty():
-            parser.error("interactive setup requires a terminal; use make install in scripts")
+            parser.error(
+                "the guided setup needs a terminal; run it from one, or install "
+                "without --interactive"
+            )
         try:
             return interactive_setup(home=Path.home(), check_online=not args.offline)
         except (EOFError, KeyboardInterrupt):

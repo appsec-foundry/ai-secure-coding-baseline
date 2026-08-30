@@ -1412,7 +1412,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
     completed = cli(["--interactive"], home)
     check("guided setup refuses to run without a terminal",
-          completed.returncode == 2 and "requires a terminal" in completed.stderr,
+          completed.returncode == 2 and "needs a terminal" in completed.stderr,
           completed.stderr[:200])
 
     completed = cli(["codex", "--into", str(project)], home)

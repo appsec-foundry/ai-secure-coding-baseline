@@ -31,8 +31,11 @@ import json
 import re
 import sys
 
-payload = json.load(sys.stdin)
-commit = payload.get("commit")
+try:
+    payload = json.load(sys.stdin)
+except ValueError:
+    raise SystemExit("GitHub did not return a readable answer")
+commit = payload.get("commit") if isinstance(payload, dict) else None
 sha = commit.get("sha") if isinstance(commit, dict) else None
 if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
     raise SystemExit("GitHub did not return a valid main commit")
