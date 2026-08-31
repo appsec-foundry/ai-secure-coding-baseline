@@ -1,8 +1,7 @@
 # Adapting AISCB inside an organization
 
-This guide explains how to add organization-specific rules and approved values
-without changing AISCB itself. The result can be distributed consistently to
-developer machines, repositories, CI, and cloud agents.
+This guide shows how to add organization-specific rules and approved values
+without changing AISCB, then distribute them consistently.
 
 The examples use Acme, Acme SSO, and internal blueprints. Replace these names
 with your own. This guide is a recommendation, not part of the baseline.
@@ -19,10 +18,9 @@ Keep five parts separate:
 | Blueprints | Approved values such as libraries, claim names, limits, headers, and mappings |
 | Tool adapters | Generated files in the format each assistant loads |
 
-This separation keeps the instructions small and maintainable:
+Use each part for one kind of content:
 
-- Put an invariant in the overlay when it must always be visible. For example:
-  every protected query must bind the authenticated tenant.
+- Put invariants that must always be visible in the overlay.
 - Put detailed rules and test cases in a requirement pack, grouped by a useful
   domain such as authentication, tenant isolation, browser security, or APIs.
 - Put approved values in a blueprint when the rule can be understood without
@@ -30,27 +28,24 @@ This separation keeps the instructions small and maintainable:
 - Use an AISCB mapping only when an organization rule genuinely makes an AISCB
   rule more specific. Give organization-only requirements their own stable IDs.
 
-The overlay may narrow AISCB but must never relax it. Instructions also do not
-replace application controls: enforce requirements that must always hold with
-tests, CI, permissions, deployment policy, or runtime controls.
+The overlay may narrow AISCB but never relax it. Enforce properties that must
+hold with application controls, tests, CI, or deployment policy as well.
 
 ## Before you start
 
-Assign owners for upstream updates, organization requirements, and supported
-tools. Use an internal repository with protected review, publish each approved
-bundle as an immutable release, and verify its signature or pinned file
-digests. Define supported tools and operating systems, then prepare a staged
-rollout, rollback, and inventory process.
+Assign owners for upstream updates, organization requirements, and tool
+support. Review bundles in a protected repository, publish immutable releases,
+and verify them by signature or pinned digests. Define rollout, rollback, and
+inventory for each supported tool and operating system.
 
 Use managed package or device management where possible. The current AISCB
 installer and version helper require Python 3.10 or newer. The examples below
 use Unix paths; on Windows, use the platform's managed and transactional
 installation mechanism instead of translating shell commands literally.
 
-An approved bundle contains the unchanged AISCB file, the overlay, requirement
-catalog and packs, blueprints, generated tool adapters, and a manifest with
-versions and digests. Install releases side by side and switch the whole bundle
-atomically, for example:
+Bundle the unchanged AISCB file, overlay, requirement catalog and packs,
+blueprints, generated adapters, and a versioned manifest. Install releases side
+by side and switch atomically, for example:
 
 ```text
 ~/.local/share/aiscb/
@@ -59,9 +54,9 @@ atomically, for example:
 └── current -> releases/acme-sec-1.0.0/
 ```
 
-Verify all files before switching `current`, and keep the previous release for
-offline rollback. Generated paths must point to the immutable release directory,
-not `current`; otherwise an open session could combine files from two releases.
+Verify the bundle before switching `current` and retain the previous release.
+Generated paths must point to the immutable release, not `current`, so a running
+session cannot mix releases.
 
 ## 1. Create a small organization overlay
 
@@ -98,14 +93,12 @@ and report the problem. Do not invent a substitute.
   permissions from request data.
 ```
 
-Stopping only the affected work matters: continuing without required identity
-or permission rules would fail open, while unrelated work can still proceed.
+This stops work that lacks required policy without blocking unrelated work.
 
 ## 2. Add requirement packs and routing
 
-Use one pack per coherent domain rather than one file per requirement. Keep
-policy history and rationale in the authoritative policy system; packs should
-contain only the instructions and acceptance criteria needed to do the work.
+Use one pack per domain. Keep history and rationale in the policy system; packs
+need only actionable instructions and acceptance criteria.
 
 Maintain a catalog that records each pack's ID, file, owner, source, concise
 trigger description, optional path triggers, and requirement mappings. Use two
@@ -114,9 +107,9 @@ mapping types:
 - `narrows`: the organization requirement makes named AISCB rules more specific;
 - `organization`: the requirement stands alone and has no invented AISCB target.
 
-Several packs may match one task. Validation must reject missing sources,
-duplicate IDs, unknown mapping types, invalid AISCB targets, contradictory
-routes, and missing or uncataloged packs.
+Several packs may match. Reject missing sources or packs, duplicate IDs,
+unknown mapping types, invalid AISCB targets, contradictory routes, and
+uncataloged packs.
 
 Each pack should contain stable requirement IDs, actionable rules, referenced
 blueprints, and representative positive and negative tests. Do not repeat AISCB
@@ -135,50 +128,34 @@ Verify successful SSO, invalid issuer and audience, unknown groups, missing
 configuration, logout invalidation, and absence of secrets in logs.
 ```
 
-Keep the number of packs small and trigger descriptions short. The catalog is
-the single source for generated skill metadata and fallback routes; its summary
-does not replace the full pack.
+Keep pack counts and trigger descriptions small. Generate discovery metadata
+from the catalog; catalog summaries do not replace packs.
 
 ## 3. Store approved values in blueprints
 
-Blueprints hold approved values and patterns, not behavioral requirements.
-Examples include cookie attributes, headers, claim names, group-to-permission
-mappings, token values, schema libraries, request and page limits, error shapes,
-and permitted log fields.
+Blueprints contain approved values, not behavior: for example claim names,
+group mappings, cookie attributes, headers, libraries, limits, error shapes,
+and permitted log fields. The overlay or pack says when a value is required.
 
-Give every blueprint a strict schema and compatibility version. Reject unknown
-fields, invalid types, duplicate keys, unsupported versions, and values outside
-their allow-lists. Keep the overlay or pack responsible for saying what is
-mandatory; the blueprint supplies the approved value.
+Version each blueprint and validate it with a strict schema. Reject unknown or
+duplicate fields, invalid types or values, and incompatible versions. Load only
+the verified bundle copy; keep source URLs as provenance metadata, not policy.
 
-Point instructions to verified files inside the bundle, not to live URLs. This
-keeps work available offline and prevents a changed page or proxy response from
-becoming policy. Source URLs belong in mirror-job metadata.
-
-Prefer maintaining blueprints in Git and generating the intranet view. If the
-intranet must remain authoritative, use a scheduled job to propose changes
-instead of publishing them directly. The reviewed job must fetch only from an
-allowed HTTPS host, reject off-host redirects, enforce time and size limits,
-validate content and compatibility in a temporary file, and open one pull
-request only when valid content changed. Every failure leaves the last approved
-copy untouched. Pin external CI actions and install exact, reviewed dependencies
-from a frozen file with hashes.
-
-Treat changes affecting authentication, authorization, transport, secrets, or
-resource limits like policy changes. Faster updates are suitable only for
-compatible values, with the supported overlay major recorded in the blueprint
-and bundle manifest.
+Maintain blueprints through reviewed Git changes. If another system is
+authoritative, constrain imports to its allow-listed HTTPS endpoint, reject
+off-host redirects, and validate bounded downloads before opening a pull
+request. Failures leave the approved copy untouched. Review changes to
+authentication, authorization, transport, secrets, or limits as policy changes;
+allow a faster path only for compatible, non-security-sensitive values.
 
 ## 4. Generate adapters for each tool
 
-Generate adapters from the reviewed baseline, overlay, catalog, packs, and
-blueprints; do not edit generated files by hand. When a tool needs one combined
-file, place AISCB before the overlay and remove the overlay's import marker.
+Generate adapters from reviewed bundle sources; do not edit them by hand. In a
+combined file, place AISCB before the overlay and remove its import marker.
 
-Keep only AISCB, the compact overlay, and discovery metadata in the initial
-context. Load detailed packs only when their semantic or path triggers match.
-Prefer native Agent Skills for semantic triggers and path-scoped instructions
-for reliable directory or file-pattern matches.
+Initially load only AISCB, the overlay, and discovery metadata. Load packs on
+matching semantic or path triggers. Prefer native skills for semantic triggers
+and path-scoped instructions for directory or file-pattern matches.
 
 | Tool | On-demand packs | Path-specific option |
 | --- | --- | --- |
@@ -186,29 +163,24 @@ for reliable directory or file-pattern matches.
 | Codex | `.agents/skills/<pack>/SKILL.md` | Nested `AGENTS.md` when directory scope fits |
 | Copilot | `.github/skills/` or `.agents/skills/` | `.github/instructions/*.instructions.md` with `applyTo` |
 
-When a supported surface cannot load skills, generate a compact route with the
-domain, trigger, and verified pack path. If it cannot read a pack on demand,
-select the applicable packs when building that repository's adapter. Verify
-deferred loading with behavior tests; an instruction to load later is not a
-client guarantee.
+If a surface cannot load skills, generate a compact route with the domain,
+trigger, and verified pack path. If it cannot load packs on demand, include the
+applicable packs in its adapter. Test deferred loading.
 
-Do not duplicate a full route table in verbose skill descriptions. Set size and
-token budgets for always-loaded content, discovery metadata, and each pack, and
-fail generation on unexpected growth or repeated requirement text.
+Set size and token budgets for initial content, discovery metadata, and packs.
+Fail generation on unexpected growth or repeated requirements.
 
 Tool-specific points:
 
 - **Claude Code:** use managed-policy `CLAUDE.md` or another root-managed,
-  immutable path for organization-wide enforcement. Relative imports suit
-  committed project files; user-level absolute imports are convenience, not an
-  organization control. Imports load eagerly, while skills load on demand.
+  immutable path for organization-wide enforcement. Imports load eagerly;
+  skills load on demand.
 - **Codex:** generate an `AGENTS.md` containing AISCB followed by the overlay;
   Codex has no documented import directive for this file. Keep it within the
   configured instruction limit and install packs as skills. Codex discovers its
   `AGENTS.md` chain once per run.
-- **GitHub Copilot:** relative imports are not uniform across all surfaces. Use
-  them only for a verified CLI-only adapter; otherwise generate combined
-  repository instructions. Check the support matrix for each enabled surface.
+- **GitHub Copilot:** because import support varies by surface, use relative
+  imports only where verified; otherwise generate combined instructions.
 
 Relevant documentation: [Claude Code instructions](https://code.claude.com/docs/en/memory)
 and [skills](https://code.claude.com/docs/en/slash-commands),
@@ -216,11 +188,9 @@ and [skills](https://code.claude.com/docs/en/slash-commands),
 [skills](https://developers.openai.com/codex/skills/), and the GitHub Copilot
 [custom-instructions support matrix](https://docs.github.com/en/copilot/reference/custom-instructions-support).
 
-Record each generated adapter's digest in the manifest. Refuse to overwrite a
-locally changed adapter automatically; an interactive updater may offer backup
-and replacement after confirmation. Validate source files separately because a
-combined adapter intentionally contains two baseline IDs, then verify the
-generated file against its manifest digest.
+Record adapter digests in the manifest. Do not overwrite local changes without
+confirmation and backup. Validate source files before generation, then verify
+the generated adapter against its digest.
 
 ## 5. Release and distribute the bundle
 
@@ -232,15 +202,13 @@ Publish each approved bundle under an immutable version. Its manifest records:
 - adapter-generator version and measured instruction budgets; and
 - release provenance or package-signature reference.
 
-A protected branch is not an immutable release, and pulling from a moving
-branch is not an integrity check. Prefer signed internal packages or device
-management for developer machines, pinned bundle updates through bot pull
-requests for repositories used by CI or cloud agents, and a manually verified
-installer only when neither is available.
+A protected or moving branch is not an immutable release. Prefer signed
+packages or device management for developer machines, pinned bot updates for
+repositories, and a manually verified installer only as a fallback.
 
-Roll out to a small group first, retain the previous bundle, and make rollback
-a single managed version change. Use package or device management for inventory;
-an assistant's version response does not prove fleet state.
+Roll out to a small group first and keep rollback to one managed version change.
+Use package or device management for inventory; an assistant response does not
+prove fleet state.
 
 ## 6. Update before starting the assistant
 
@@ -249,11 +217,9 @@ task before the assistant starts. Do not update instruction files from a
 session-start hook: tools may already have loaded the previous version while a
 helper reports the new disk version.
 
-If the network is unavailable, retain the last verified bundle and report its
-age according to your staleness policy. Track the last attempt separately from
-the last successful update. A startup hook may report only what it knows, for
-example `AISCB bundle installed on disk: acme-sec-1.0.0`; it must not claim that
-the same version is loaded into the model.
+If offline, retain the last verified bundle and apply the staleness policy.
+Track the last attempt separately from the last successful update. A startup
+hook may report the installed version, but not claim that the model loaded it.
 
 ## 7. Extend the upstream tooling
 
@@ -268,17 +234,15 @@ packs, blueprints, and adapters needs a bundle-oriented installer that:
 - preserves unrelated files and rejects unsafe symlink destinations; and
 - reports the manifest's bundle ID instead of parsing a combined adapter.
 
-If the fork keeps the upstream online release check, preserve its URL,
-redirect, and destination validation. Ship reviewed helper sources instead of
-editing installed copies. Remove or redirect that check when internal release
-inventory already provides the expected version.
+If the fork keeps the upstream release check, preserve its URL, redirect, and
+destination validation. Ship reviewed helper sources rather than editing
+installed copies.
 
-Automated checks should cover catalog and mapping consistency, valid AISCB
-references, unique requirement IDs and sources, complete routes, strict
-blueprint schemas and compatibility, safe bundle paths, replaced placeholders,
-correct adapter ordering, size and token budgets, manifest digests, and atomic
-installation. Test install, update, rollback, interruption, local drift,
-missing or incompatible content, and unavailable packs on every supported OS.
+Automate checks for catalog consistency, valid AISCB mappings, unique IDs,
+complete routes, blueprint schemas and compatibility, safe paths, replaced
+placeholders, adapter order and budgets, manifest digests, and atomic install.
+Test install, update, rollback, interruption, drift, and missing or incompatible
+content on each supported operating system.
 
 ## 8. Verify installation, loading, and behavior
 
