@@ -221,6 +221,8 @@ Add stack-specific details such as approved libraries or framework patterns. Kee
 - `aiscb-0.1.10+acme`: a version derived from AISCB.
 - `acme-sec-1.0.0`: an independent baseline.
 
+To leave the baseline file unchanged and put your rules in a second one beside it, see [adapting AISCB inside an organization](docs/adapting-in-an-organization.md).
+
 Keep application-specific security requirements separate. The baseline governs assistant behavior; tests, CI checks, review gates, and runtime controls enforce the application's requirements.
 
 ## Evidence and related guidance
