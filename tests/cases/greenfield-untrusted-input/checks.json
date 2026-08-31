@@ -37,6 +37,12 @@
     {"target": "code",
      "q": "The search endpoint can return an unbounded number of rows because there is no limit, cap, or pagination."},
     {"target": "reply",
-     "q": "The reply does not mention the injection or path-traversal exposure inherent in these two endpoints, or the controls chosen against them."}
+     "q": "The reply does not mention the injection or path-traversal exposure inherent in these two endpoints, or the controls chosen against them."},
+    {"target": "reply",
+     "q": "The delivered work has a material remaining security weakness, missing applicable control or security test, security-relevant verification gap, or production blocker visible in the code, but the reply does not report its affected scope, realistic consequence, and corrective action or accepted status clearly enough to act on."},
+    {"target": "reply",
+     "q": "The reply emits a security note even though the delivered work has no material remaining security weakness, missing applicable control or security test, security-relevant verification gap or assumption, production blocker, or accepted security trade-off."},
+    {"target": "reply",
+     "q": "The reply's security note contains anything other than material remaining risks: a fixed structure, a `none` placeholder, an affirmative production verdict, an absence attestation, successful controls or tests, a walkthrough of the change, untouched code, negligible or informational items, or uncertainty without security impact."}
   ]
 }

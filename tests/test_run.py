@@ -3,6 +3,7 @@
 
 import importlib.util
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -127,6 +128,69 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(set(checks), {"passes", "fails"})
         self.assertEqual(checks["passes"]["claude"]["baseline"], [0, 1])
         self.assertEqual(checks["fails"]["claude"]["baseline"], [1, 1])
+
+    def test_claude_install_uses_a_location_inside_the_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workdir = Path(tmp)
+            before = RUNNER.snapshot(workdir)
+            RUNNER.install_claude(workdir)
+            installed = workdir / ".claude" / "rules" / RUNNER.BASELINE.name
+            self.assertTrue(installed.is_file())
+            self.assertIn("baseline-id:", installed.read_text(encoding="utf-8"))
+            # The installed rules are not the assistant's work: they must not
+            # reach the judge, the patterns, or the fixture diff.
+            self.assertEqual(RUNNER.collect_files(workdir), {})
+            self.assertEqual(RUNNER.diff_against_fixture(before, workdir)["added"], [])
+
+    def test_preflight_rejects_a_control_arm_that_already_carries_the_baseline(self):
+        identifier = RUNNER.baseline_identifier()
+        replies = {
+            "control": f"Baseline loaded: {identifier} from ~/.claude/CLAUDE.md.",
+            "baseline": f"Baseline loaded: {identifier} from the project rules.",
+        }
+        probes = self.probe_with(replies)
+        control = next(p for p in probes if p["arm"] == "control")
+        self.assertFalse(control["ok"])
+        self.assertEqual(control["found"], [identifier])
+        self.assertIn("both arms measure the same rules",
+                      RUNNER.preflight_problem(control))
+        self.assertTrue(next(p for p in probes if p["arm"] == "baseline")["ok"])
+
+    def test_preflight_rejects_a_baseline_arm_that_loaded_nothing(self):
+        replies = {"control": "No baseline is loaded.",
+                   "baseline": "No baseline is loaded."}
+        probes = self.probe_with(replies)
+        self.assertTrue(next(p for p in probes if p["arm"] == "control")["ok"])
+        broken = next(p for p in probes if p["arm"] == "baseline")
+        self.assertFalse(broken["ok"])
+        self.assertIn("did not reach", RUNNER.preflight_problem(broken))
+
+    def test_preflight_sees_any_version_of_the_baseline_in_the_control_arm(self):
+        family = RUNNER.id_family(RUNNER.baseline_identifier())
+        older = re.sub(r"-\d+\.\d+\.\d+.*$", "-0.0.1",
+                       RUNNER.baseline_identifier())
+        self.assertEqual(family.findall(f"carries {older}, an older copy."), [older])
+
+    def probe_with(self, replies: dict) -> list[dict]:
+        original = RUNNER.probe_reply
+        RUNNER.probe_reply = lambda tool, arm, args: replies[arm]
+        try:
+            return RUNNER.preflight(["claude"], ["control", "baseline"], None)
+        finally:
+            RUNNER.probe_reply = original
+
+    def test_security_note_table_reports_counts_against_the_expected_number(self):
+        runs = [
+            {"case": "demo", "tool": "claude", "arm": "control", "complete": True,
+             "security_notes": 2, "security_notes_expected": 0},
+            {"case": "demo", "tool": "claude", "arm": "baseline", "complete": True,
+             "security_notes": 0, "security_notes_expected": 0},
+            {"case": "open", "tool": "claude", "arm": "baseline", "complete": True,
+             "security_notes": 1, "security_notes_expected": None},
+        ]
+        table = "\n".join(RUNNER.security_note_table(runs))
+        self.assertIn("| demo | claude | 2.0 | 0.0 | 0 |", table)
+        self.assertIn("| open | claude | — | 1.0 | — |", table)
 
     def test_report_lists_unscored_judge_decisions(self):
         runs = [{

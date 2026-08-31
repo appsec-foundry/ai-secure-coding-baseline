@@ -45,7 +45,8 @@ RESULTS_DIR = HERE / "results"
 # Never part of what the assistant wrote.
 SKIP_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "dist",
              "build", "target", ".next", "coverage", ".pytest_cache"}
-SKIP_NAMES = {"CLAUDE.md", "AGENTS.md", "package-lock.json", "yarn.lock",
+SKIP_NAMES = {"CLAUDE.md", "AGENTS.md", BASELINE.name,
+              "package-lock.json", "yarn.lock",
               "pnpm-lock.yaml", "poetry.lock", "Cargo.lock",
               "_agent_stdout.log", "_agent_reply.txt"}
 MAX_FILE_BYTES = 400_000
@@ -55,6 +56,14 @@ SECURITY_NOTE_HEADING = re.compile(
     r"^\s{0,3}(?:#{1,6}\s+)?(?:\*\*)?Security note \(AISCB baseline\)"
     r"(?:\*\*)?\s*$", re.MULTILINE
 )
+
+# The baseline answers this prompt from context alone, which is what makes it
+# usable as a probe: it reports the ids in scope and the file each came from.
+PROBE_PROMPT = "baseline?"
+BASELINE_ID_LINE = re.compile(r"^`baseline-id: ([^`]+)`", re.MULTILINE)
+SEMVER_TAIL = (r"\d+\.\d+\.\d+"
+               r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+               r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?")
 
 
 # Output that means the account is out of budget, not that the case failed.
@@ -98,8 +107,16 @@ def run_capture(cmd, cwd: Path, timeout: int, shell: bool = False):
 # --------------------------------------------------------------------------
 
 def install_claude(workdir: Path) -> None:
-    """Native import—the mechanism the README recommends for Claude Code."""
-    (workdir / "CLAUDE.md").write_text(f"@{BASELINE}\n", encoding="utf-8")
+    """The project rules directory that `scripts/install.py` installs into.
+
+    An `@path` line in CLAUDE.md is expanded only for files inside the project,
+    so importing the repository copy from a throwaway workdir loaded nothing
+    and turned the baseline arm into a second control without saying so. The
+    preflight probe exists because that failure is invisible in the report.
+    """
+    target = workdir / ".claude" / "rules" / BASELINE.name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(BASELINE, target)
 
 
 def install_codex(workdir: Path) -> None:
@@ -133,11 +150,88 @@ def cmd_codex(workdir: Path, prompt: str, model: str | None,
 
 ADAPTERS = {
     # resume_scope: "dir" is safe under parallelism, "global" is not
+    # user_scope: where a machine-wide install would sit in every run's context
     "claude": {"install": install_claude, "cmd": cmd_claude,
-               "reply": "stdout", "resume_scope": "dir"},
+               "reply": "stdout", "resume_scope": "dir",
+               "user_scope": "~/.claude/CLAUDE.md and ~/.claude/"},
     "codex": {"install": install_codex, "cmd": cmd_codex,
-              "reply": "file", "resume_scope": "global"},
+              "reply": "file", "resume_scope": "global",
+              "user_scope": "~/.codex/AGENTS.md"},
 }
+
+
+# --------------------------------------------------------------------------
+# Preflight: prove the two arms differ before spending the matrix on them
+# --------------------------------------------------------------------------
+
+def baseline_identifier() -> str:
+    match = BASELINE_ID_LINE.search(BASELINE.read_text(encoding="utf-8"))
+    if not match:
+        sys.exit(f"no baseline-id line in {BASELINE}")
+    return match.group(1)
+
+
+def id_family(identifier: str) -> re.Pattern:
+    """Any version of this baseline, so an older copy in scope is still seen."""
+    name = re.sub(rf"-{SEMVER_TAIL}$", "", identifier)
+    return re.compile(rf"\b{re.escape(name)}-{SEMVER_TAIL}")
+
+
+def probe_reply(tool: str, arm: str, args) -> str:
+    """Ask one throwaway session which baseline it is carrying."""
+    workdir = Path(tempfile.mkdtemp(prefix=f"bl-probe-{tool}-{arm}-",
+                                    dir=args.workroot))
+    try:
+        if arm == "baseline":
+            ADAPTERS[tool]["install"](workdir)
+        cmd = ADAPTERS[tool]["cmd"](workdir, PROBE_PROMPT, args.model, 1)
+        rc, out, err = run_capture(cmd, workdir, args.timeout)
+        if rc != 0 and LIMIT_PATTERNS.search(out + err):
+            raise QuotaExhausted((out + err).strip()[:200])
+        if ADAPTERS[tool]["reply"] == "file":
+            path = workdir / REPLY_FILE
+            return path.read_text(encoding="utf-8") if path.is_file() else ""
+        return out
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+def preflight(tools: list[str], arms: list[str], args) -> list[dict]:
+    """Check that control carries no baseline and baseline carries this one.
+
+    Both failures produce the same report—two columns that barely differ—and
+    both are invisible in it: a machine-wide install puts the rules in the
+    control arm, and an install mechanism that quietly stops working takes
+    them out of the baseline arm. Neither is worth discovering after hours of
+    agent runs.
+    """
+    expected = baseline_identifier()
+    family = id_family(expected)
+    probes = []
+    for tool in tools:
+        for arm in arms:
+            reply = probe_reply(tool, arm, args)
+            found = sorted(set(family.findall(reply)))
+            ok = not found if arm == "control" else expected in found
+            probes.append({
+                "tool": tool, "arm": arm, "ok": ok, "found": found,
+                "expected": expected if arm == "baseline" else None,
+                "reply": reply.strip()[:400],
+            })
+    return probes
+
+
+def preflight_problem(probe: dict) -> str:
+    scope = ADAPTERS[probe["tool"]].get("user_scope", "the user-level location")
+    if probe["arm"] == "control":
+        return (f"{probe['tool']} control already carries "
+                f"{', '.join(probe['found'])}. A user- or machine-level install "
+                f"is in every run, so both arms measure the same rules. Remove "
+                f"it ({scope}) and rerun.")
+    return (f"{probe['tool']} baseline does not carry {probe['expected']} "
+            f"(reported: {', '.join(probe['found']) or 'nothing'}). The project "
+            f"install did not reach the assistant's context, so the baseline "
+            f"arm would silently be a second control.")
 
 
 # --------------------------------------------------------------------------
@@ -209,7 +303,7 @@ def diff_against_fixture(before: dict[str, str], workdir: Path) -> dict:
                            if f in after and after[f] != h),
         "deleted": sorted(f for f in before if f not in after),
         "added": sorted(f for f in after
-                        if f not in before and f not in SKIP_NAMES),
+                        if f not in before and Path(f).name not in SKIP_NAMES),
     }
 
 
@@ -528,9 +622,17 @@ def run_one(case: dict, tool: str, arm: str, rep: int, args) -> dict:
     complete = (len(replies) == len(case["turns"])
                 and all(c == 0 for c in turn_codes))
 
+    # Counted for every case, not only the ones with a contract: a note that
+    # appears where the case expects none is the failure mode worth seeing.
+    contracts = case["checks"].get("conversation", [])
+    notes = [len(SECURITY_NOTE_HEADING.findall(r)) for r in replies]
+
     result = {
         "case": case["name"], "tool": tool, "arm": arm, "repeat": rep,
         "turns": len(replies), "turns_expected": len(case["turns"]),
+        "security_notes": sum(notes), "security_notes_per_turn": notes,
+        "security_notes_expected": (sum(c["security_note_count"] for c in contracts)
+                                    if contracts else None),
         "turn_exit_codes": turn_codes, "complete": complete,
         "seconds": round(time.time() - started, 1),
         "files_written": len(files), "diff": diff, "workdir": str(workdir),
@@ -570,6 +672,45 @@ def aggregate(runs: list[dict]) -> dict:
     return agg
 
 
+def security_note_table(runs: list[dict]) -> list[str]:
+    """Where the notes landed, next to where the case expects them.
+
+    A note belongs on a material remaining risk and nowhere else, so the
+    number is only readable against the case: on a case whose contract expects
+    none, any note is one too many, and on a case that accepts a risk, a
+    missing note is the finding. The per-check table scores that only where a
+    contract exists; this covers every case, including the greenfield ones
+    whose expected count is not fixed in advance.
+    """
+    counted = [r for r in runs
+               if r.get("complete") and r.get("security_notes") is not None]
+    if not counted:
+        return []
+    totals: dict = {}
+    for r in counted:
+        entry = totals.setdefault((r["case"], r["tool"]),
+                                  {"expected": r.get("security_notes_expected")})
+        cell = entry.setdefault(r["arm"], [0, 0])
+        cell[0] += r["security_notes"]
+        cell[1] += 1
+    lines = ["## Security notes per run", "",
+             "Notes per completed run, against the count the case's conversation",
+             "contract requires. `—` means the case has no contract and leaves the",
+             "judgement to the judge; there, both arms are read against each other.",
+             "",
+             "| Case | Tool | control | baseline | expected |", "|---|---|---|---|---|"]
+    for (case, tool), entry in sorted(totals.items()):
+        cells = []
+        for arm in ("control", "baseline"):
+            hits, n = entry.get(arm, [0, 0])
+            cells.append(f"{hits / n:.1f}" if n else "—")
+        expected = entry["expected"]
+        lines.append(f"| {case} | {tool} | {cells[0]} | {cells[1]} | "
+                     f"{'—' if expected is None else expected} |")
+    lines.append("")
+    return lines
+
+
 def write_report(runs: list[dict], agg: dict, outdir: Path, args) -> Path:
     lines = ["# Baseline effect report", "",
              f"- Generated: {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
@@ -577,6 +718,14 @@ def write_report(runs: list[dict], agg: dict, outdir: Path, args) -> Path:
              f"- Assistant model: {args.model or 'tool default'}",
              f"- Judge: {'off' if args.no_judge else (args.judge_model or 'claude default')}",
              ""]
+    probes = getattr(args, "probes", None)
+    if probes:
+        lines += ["Preflight: what each arm reported carrying when asked "
+                  f"`{PROBE_PROMPT}` before the matrix started.", ""]
+        lines += [f"- {p['tool']} / {p['arm']}: "
+                  f"{', '.join(p['found']) if p['found'] else 'no baseline'}"
+                  for p in probes]
+        lines.append("")
     if getattr(args, "aborted", None):
         lines += [f"> **Incomplete matrix.** The run stopped early: {args.aborted}",
                   "> Whatever is below covers fewer runs than the settings say.", ""]
@@ -603,6 +752,8 @@ def write_report(runs: list[dict], agg: dict, outdir: Path, args) -> Path:
               "against 0/3 reaches 0.05; 2/3 against 0/3 is 0.20 and 1/3 against",
               "0/3 is 0.50. The column is there to stop a one-run difference from",
               "being read as an effect.", ""]
+
+    lines += security_note_table(runs)
 
     dropped = [r for r in runs if not r.get("complete")]
     if dropped:
@@ -698,12 +849,27 @@ def main() -> int:
           f"x {len(tools)} tools x {len(arms)} arms x {args.repeats} repeats")
     if not args.no_judge:
         print(f"plus up to {len(jobs) * max(1, args.judge_votes)} judge calls")
+    print(f"plus {len(tools) * len(arms)} preflight probes")
     if args.dry_run:
         for c, t, a, r in jobs:
             print(f"  {c['name']} / {t} / {a} #{r}")
         return 0
 
     Path(args.workroot).mkdir(parents=True, exist_ok=True)
+
+    try:
+        probes = preflight(tools, arms, args)
+    except QuotaExhausted as exc:
+        sys.exit(f"out of budget during preflight: {exc}")
+    for probe in probes:
+        print(f"  [{'ok' if probe['ok'] else '!!'}] preflight {probe['tool']:<7} "
+              f"{probe['arm']:<8} "
+              f"{', '.join(probe['found']) if probe['found'] else 'no baseline'}")
+    broken = [p for p in probes if not p["ok"]]
+    if broken:
+        sys.exit("\n".join(["the arms are not distinct, so the matrix would "
+                            "measure nothing:"]
+                           + [f"  {preflight_problem(p)}" for p in broken]))
     started = time.time()
     runs: list[dict] = []
     aborted = None
@@ -737,6 +903,7 @@ def main() -> int:
     outdir = RESULTS_DIR / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     outdir.mkdir(parents=True, exist_ok=True)
     args.aborted = aborted
+    args.probes = probes
     report = write_report(runs, aggregate(runs), outdir, args)
 
     if not args.keep:
