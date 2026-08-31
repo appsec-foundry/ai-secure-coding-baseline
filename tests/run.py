@@ -148,16 +148,29 @@ def cmd_codex(workdir: Path, prompt: str, model: str | None,
     return cmd + [prompt]
 
 
+# Pinned, not left to the CLI default: a result belongs to the model that
+# produced it, and a default that moves under the suite makes two campaigns
+# incomparable without either report saying so. Per tool, because --model goes
+# to whichever tool runs and a Claude model name is not a Codex model name.
+JUDGE_MODEL = "claude-sonnet-4-6"
+
 ADAPTERS = {
     # resume_scope: "dir" is safe under parallelism, "global" is not
     # user_scope: where a machine-wide install would sit in every run's context
     "claude": {"install": install_claude, "cmd": cmd_claude,
                "reply": "stdout", "resume_scope": "dir",
+               "model": "claude-sonnet-4-6",
                "user_scope": "~/.claude/CLAUDE.md and ~/.claude/"},
     "codex": {"install": install_codex, "cmd": cmd_codex,
               "reply": "file", "resume_scope": "global",
+              "model": None,
               "user_scope": "~/.codex/AGENTS.md"},
 }
+
+
+def model_for(tool: str, args) -> str | None:
+    """--model overrides every selected tool; otherwise the tool's pin."""
+    return args.model or ADAPTERS[tool].get("model")
 
 
 # --------------------------------------------------------------------------
@@ -184,7 +197,7 @@ def probe_reply(tool: str, arm: str, args) -> str:
     try:
         if arm == "baseline":
             ADAPTERS[tool]["install"](workdir)
-        cmd = ADAPTERS[tool]["cmd"](workdir, PROBE_PROMPT, args.model, 1)
+        cmd = ADAPTERS[tool]["cmd"](workdir, PROBE_PROMPT, model_for(tool, args), 1)
         rc, out, err = run_capture(cmd, workdir, args.timeout)
         if rc != 0 and LIMIT_PATTERNS.search(out + err):
             raise QuotaExhausted((out + err).strip()[:200])
@@ -258,6 +271,24 @@ def load_cases(names: list[str] | None) -> list[dict]:
         if missing:
             sys.exit(f"unknown case(s): {', '.join(sorted(missing))}")
     return cases
+
+
+def filter_by_requirements(cases: list[dict], spec: str) -> list[dict]:
+    """Select the cases that declare one of the given rule groups.
+
+    A baseline change belongs to a rule group, and the cases already name the
+    groups they exercise, so this is the selection that matches what changed
+    without maintaining a second list of case names somewhere.
+    """
+    wanted = {r.strip() for r in spec.split(",") if r.strip()}
+    selected = [c for c in cases
+                if wanted & set(c["checks"].get("requirements", []))]
+    if not selected:
+        known = sorted({r for c in cases
+                        for r in c["checks"].get("requirements", [])})
+        sys.exit(f"no case declares {', '.join(sorted(wanted))}. "
+                 f"Cases cover: {', '.join(known)}")
+    return selected
 
 
 # --------------------------------------------------------------------------
@@ -496,6 +527,22 @@ def run_judge(files: dict[str, str], reply: str, questions: list[dict],
     return verdicts
 
 
+def votes_decided(rounds: list[list[dict]], questions: list[dict],
+                  wanted: int) -> bool:
+    """True when no remaining round could change a single majority.
+
+    Two agreeing votes out of three settle the verdict, and the third call
+    costs the same as the first two. Abstentions do not settle anything, so a
+    split or unclear question still uses the full budget.
+    """
+    left = wanted - len(rounds)
+    for i in range(len(questions)):
+        votes = [v.get("verdict") for r in rounds for v in r if v.get("id") == i]
+        if abs(votes.count("fail") - votes.count("pass")) <= left:
+            return False
+    return True
+
+
 def judge_with_votes(files: dict[str, str], reply: str, questions: list[dict],
                      args) -> list[dict]:
     """Ask the judge several times and take the majority.
@@ -505,9 +552,13 @@ def judge_with_votes(files: dict[str, str], reply: str, questions: list[dict],
     """
     if not questions:
         return []
-    rounds = [run_judge(files, reply, questions, args.judge_model,
-                        args.judge_timeout)
-              for _ in range(max(1, args.judge_votes))]
+    wanted = max(1, args.judge_votes)
+    rounds: list[list[dict]] = []
+    for _ in range(wanted):
+        rounds.append(run_judge(files, reply, questions, args.judge_model,
+                                args.judge_timeout))
+        if votes_decided(rounds, questions, wanted):
+            break  # the remaining calls cannot change any majority
     merged = []
     for i, q in enumerate(questions):
         votes = [v.get("verdict") for r in rounds for v in r if v.get("id") == i]
@@ -575,7 +626,7 @@ def run_one(case: dict, tool: str, arm: str, rep: int, args) -> dict:
 
     replies, turn_codes, log = [], [], ""
     for turn, prompt in enumerate(case["turns"], start=1):
-        cmd = ADAPTERS[tool]["cmd"](workdir, prompt, args.model, turn)
+        cmd = ADAPTERS[tool]["cmd"](workdir, prompt, model_for(tool, args), turn)
         rc, stdout, stderr = run_capture(cmd, workdir, args.timeout)
         log += (f"\n===== turn {turn} "
                 f"({'TIMEOUT' if rc == -1 else f'exit {rc}'}) =====\n"
@@ -612,15 +663,17 @@ def run_one(case: dict, tool: str, arm: str, rep: int, args) -> dict:
     verified = run_verify(workdir, case["checks"].get("verify"), args.verify_timeout)
     if verified:
         findings.append(verified)
-    judge_questions = (case["checks"].get("judge", []) +
-                       conversation_judge_questions(case["checks"]))
-    verdicts = ([] if args.no_judge else
-                judge_with_votes(files, all_replies, judge_questions, args))
-
     # A run that died before the last turn never saw the whole prompt sequence.
     # Counting it as "did not cave" would credit the baseline for a crash.
     complete = (len(replies) == len(case["turns"])
                 and all(c == 0 for c in turn_codes))
+
+    # An incomplete run is dropped from the report either way, so judging it is
+    # paid for and then thrown away.
+    judge_questions = (case["checks"].get("judge", []) +
+                       conversation_judge_questions(case["checks"]))
+    verdicts = ([] if args.no_judge or not complete else
+                judge_with_votes(files, all_replies, judge_questions, args))
 
     # Counted for every case, not only the ones with a contract: a note that
     # appears where the case expects none is the failure mode worth seeing.
@@ -711,13 +764,27 @@ def security_note_table(runs: list[dict]) -> list[str]:
     return lines
 
 
+def model_line(args) -> str:
+    """Name the model per tool, so a report says what produced its numbers."""
+    if args.model:
+        return f"{args.model} (--model, every selected tool)"
+    tools = [t.strip() for t in getattr(args, "tools", "claude").split(",")
+             if t.strip() in ADAPTERS]
+    return ", ".join(f"{t}: {ADAPTERS[t].get('model') or 'tool default'}"
+                     for t in tools) or "tool default"
+
+
 def write_report(runs: list[dict], agg: dict, outdir: Path, args) -> Path:
     lines = ["# Baseline effect report", "",
              f"- Generated: {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
              f"- Repeats per arm: {args.repeats}",
-             f"- Assistant model: {args.model or 'tool default'}",
+             f"- Assistant model: {model_line(args)}",
              f"- Judge: {'off' if args.no_judge else (args.judge_model or 'claude default')}",
              ""]
+    if args.repeats < 3:
+        lines += ["> **Not evidence.** Fewer than three repeats per arm cannot "
+                  "separate a difference from model variance. Read this as a "
+                  "check that the machinery ran, not as a result.", ""]
     probes = getattr(args, "probes", None)
     if probes:
         lines += ["Preflight: what each arm reported carrying when asked "
@@ -800,12 +867,16 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--cases", help="comma-separated case names (default: all)")
+    p.add_argument("--requirements",
+                   help="comma-separated rule groups, e.g. AISCB-REPORT-001; "
+                        "runs the cases that declare them")
     p.add_argument("--tools", default="claude", help="claude,codex")
     p.add_argument("--arms", default="control,baseline")
     p.add_argument("--repeats", type=int, default=3)
     p.add_argument("--parallel", type=int, default=1)
     p.add_argument("--model", help="model for the assistant under test")
-    p.add_argument("--judge-model", help="model for the judge (Claude)")
+    p.add_argument("--judge-model", default=JUDGE_MODEL,
+                   help=f"model for the judge (Claude); default {JUDGE_MODEL}")
     p.add_argument("--judge-votes", type=int, default=3,
                    help="judge calls per run; the majority verdict is kept")
     p.add_argument("--no-judge", action="store_true")
@@ -829,6 +900,8 @@ def main() -> int:
         if not shutil.which(t):
             sys.exit(f"{t} CLI not found on PATH")
     cases = load_cases([c.strip() for c in args.cases.split(",")] if args.cases else None)
+    if args.requirements:
+        cases = filter_by_requirements(cases, args.requirements)
     if not cases:
         sys.exit("no cases found")
 

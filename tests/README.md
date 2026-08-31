@@ -32,23 +32,34 @@ violations found in both arms.
 6. The report compares violations per check. Lower is better.
 
 Start with one affected case. The cost grows as
-`cases x tools x arms x repeats`; multi-turn cases add agent turns, each judged
-agent run adds three judge calls by default, and the preflight adds one turn
-per tool and arm. Use `make dry-run` to print the exact matrix before starting
-it.
+`cases x tools x arms x repeats`; multi-turn cases add agent turns, a judged
+agent run adds up to three judge calls, and the preflight adds one turn per
+tool and arm. Use `make dry-run` to print the exact matrix before starting it.
 
 ## Running
 
 ```bash
-make check                                         # validate the suite, no model calls
-make dry-run                                       # print the matrix
-python3 tests/run.py --cases greenfield-order-app  # one case, both arms, Claude
-make test                                          # all cases, both arms, Claude
-make test-all                                      # all cases with Claude and Codex
+make check                                    # validate the suite, no model calls
+make dry-run                                  # print the matrix, spend nothing
+make test-smoke                               # 2 turns: does the machinery work
+make test-quick                               # 24 turns: the cheapest real signal
+make test-rule RULE=AISCB-REPORT-001          # the cases covering one rule group
+make test                                     # 162 turns: every case, both arms
+make test-all                                 # the same across Claude and Codex
 ```
 
-`make test` and `make test-all` run `make check` first. Runner flags pass
-through with `ARGS="--repeats 5"`.
+The tiers exist because most questions do not need the full matrix. `test-smoke`
+runs one case once per arm — enough to see the preflight, an agent run, the
+checks, a project command, the judge and a report, and the report says in its
+header that one repeat is not evidence. `test-quick` takes one case per
+direction at three repeats. `test-rule` selects by the rule groups the cases
+declare in `checks.json`, which is the selection that matches a baseline change;
+a broad group such as `AISCB-REPORT-001` pulls in most of the suite, so check
+with `--dry-run` first. `ARGS` passes flags through, e.g.
+`make test-quick ARGS="--no-judge"`.
+
+Every model target runs `make check` first. Runner flags pass through with
+`ARGS="--repeats 5"`.
 
 `make check` validates the cases and requirements catalog, tests the validators
 against broken suites, and checks the runner. It runs on every push and pull
@@ -75,6 +86,26 @@ This is why measuring requires the baseline **not** to be installed at user
 level for the tool under test — for Claude Code the import in
 `~/.claude/CLAUDE.md`, for Codex `~/.codex/AGENTS.md`. Everything else in a
 user-level instruction file still reaches both arms.
+
+## Models and what a run costs
+
+Claude runs and the judge are pinned to `claude-sonnet-4-6`. A result belongs
+to the model that produced it: on the CLI default, two campaigns weeks apart
+can run on different models and neither report says so. Codex keeps its own
+default, because a Claude model name is not a Codex one.
+
+`--model` overrides the pin for every selected tool, so use it with one tool at
+a time. `--judge-model` overrides the judge alone. The report names what ran.
+
+Two judge calls are avoided rather than paid for: a run that did not complete
+is not judged, because it is dropped from the table anyway, and the third vote
+is skipped once the first two agree, where it cannot change the majority.
+
+The agent turns dominate the bill, not the judge. Of the 162 turns in a full
+`make test`, 78 build an application, 66 change a fixture, and 18 are design or
+review answers with no code. Cutting cases is the only lever that saves more,
+and it costs evidence: eight cases are the sole coverage of a rule group, which
+`specs/requirements.md` records.
 
 ## Test cases
 

@@ -3,7 +3,8 @@
 
 .DEFAULT_GOAL := check
 .PHONY: check coverage setup update status install uninstall install-claude \
-        install-codex install-copilot dry-run test test-all clean-results help
+        install-codex install-copilot dry-run test-smoke test-quick test-rule \
+        test test-all clean-results help
 
 # Both check and coverage run this suite, so it is listed once.
 CHECK_TESTS = tests/selfcheck.py \
@@ -50,6 +51,22 @@ install-claude install-codex install-copilot:
 ## dry-run     print the run matrix without spending anything
 dry-run:
 	python3 tests/run.py --dry-run $(ARGS)
+
+## test-smoke  does the machinery work: one case that exercises fixture, scope,
+##             judge and a project command — two agent turns, not evidence
+test-smoke: check
+	python3 tests/run.py --cases existing-targeted-verification --repeats 1 $(ARGS)
+
+## test-quick  one case per direction at full repeats: the cheapest real signal
+test-quick: check
+	python3 tests/run.py --parallel 3 --cases existing-preserve-only-change,\
+existing-scoped-change,greenfield-untrusted-input,override-demo-app $(ARGS)
+
+## test-rule   the cases covering one rule group, for a change to that rule:
+##             make test-rule RULE=AISCB-REPORT-001
+test-rule: check
+	@test -n "$(RULE)" || { echo "usage: make test-rule RULE=AISCB-REPORT-001"; exit 1; }
+	python3 tests/run.py --parallel 3 --requirements $(RULE) $(ARGS)
 
 ## test        every case, both arms, Claude — the single full run
 test: check

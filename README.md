@@ -242,7 +242,7 @@ These resources are background, not claims of certification, conformance, or com
 
 [`specs/requirements.md`](specs/requirements.md) explains the rule groups and their test coverage. Behavior changes need a proposal, sourced requirements, and a task list under [`specs/changes/`](specs/changes/); editorial and repository-only changes do not. See [`specs/README.md`](specs/README.md) for the workflow.
 
-Run `make check` after changing the baseline, specifications, test metadata, or harness. It takes seconds and makes no model calls. Model runs can take hours, so run only the cases affected by a change unless a full matrix is specifically needed. See [tests/README.md](tests/README.md) for commands, cases, and scoring.
+Run `make check` after changing the baseline, specifications, test metadata, or harness. It takes seconds and makes no model calls. Model runs can take hours, so start with `make test-smoke` to see that the harness works, and run only the cases a change affects — `make test-rule RULE=<rule group>` — unless a full matrix is specifically needed. See [tests/README.md](tests/README.md) for commands, cases, and scoring.
 
 ## License
 

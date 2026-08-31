@@ -179,6 +179,47 @@ class RunnerTests(unittest.TestCase):
         finally:
             RUNNER.probe_reply = original
 
+    def test_the_model_is_pinned_per_tool_and_overridden_for_all_of_them(self):
+        pinned = SimpleNamespace(model=None)
+        self.assertEqual(RUNNER.model_for("claude", pinned), "claude-sonnet-4-6")
+        # Codex keeps its own default: a Claude model name is not a Codex one.
+        self.assertIsNone(RUNNER.model_for("codex", pinned))
+        chosen = SimpleNamespace(model="claude-opus-5")
+        self.assertEqual(RUNNER.model_for("claude", chosen), "claude-opus-5")
+        self.assertEqual(RUNNER.model_for("codex", chosen), "claude-opus-5")
+
+    def test_report_names_the_model_each_tool_ran_on(self):
+        args = SimpleNamespace(repeats=1, model=None, no_judge=False,
+                               tools="claude,codex", judge_model="claude-sonnet-4-6",
+                               aborted=None)
+        with tempfile.TemporaryDirectory() as tmp:
+            report = RUNNER.write_report([], {}, Path(tmp), args)
+            text = report.read_text(encoding="utf-8")
+        self.assertIn("claude: claude-sonnet-4-6", text)
+        self.assertIn("codex: tool default", text)
+
+    def test_cases_are_selectable_by_the_rule_group_they_declare(self):
+        cases = [{"name": "a", "checks": {"requirements": ["AISCB-REPORT-001"]}},
+                 {"name": "b", "checks": {"requirements": ["AISCB-TESTS-001"]}}]
+        picked = RUNNER.filter_by_requirements(cases, "AISCB-REPORT-001")
+        self.assertEqual([c["name"] for c in picked], ["a"])
+        with self.assertRaises(SystemExit) as exit_info:
+            RUNNER.filter_by_requirements(cases, "AISCB-NOPE-001")
+        self.assertIn("AISCB-REPORT-001", str(exit_info.exception))
+
+    def test_a_third_judge_call_is_skipped_once_two_votes_agree(self):
+        questions = [{"q": "a"}, {"q": "b"}]
+        agree = [[{"id": 0, "verdict": "fail"}, {"id": 1, "verdict": "pass"}]] * 2
+        self.assertTrue(RUNNER.votes_decided(agree, questions, 3))
+        # One split question still needs the full budget.
+        split = [[{"id": 0, "verdict": "fail"}, {"id": 1, "verdict": "pass"}],
+                 [{"id": 0, "verdict": "fail"}, {"id": 1, "verdict": "fail"}]]
+        self.assertFalse(RUNNER.votes_decided(split, questions, 3))
+        # An abstention settles nothing.
+        unclear = [[{"id": 0, "verdict": "unclear"}, {"id": 1, "verdict": "pass"}]] * 2
+        self.assertFalse(RUNNER.votes_decided(unclear, questions, 3))
+        self.assertFalse(RUNNER.votes_decided(agree[:1], questions, 3))
+
     def test_security_note_table_reports_counts_against_the_expected_number(self):
         runs = [
             {"case": "demo", "tool": "claude", "arm": "control", "complete": True,
