@@ -1570,6 +1570,99 @@ with tempfile.TemporaryDirectory() as tmp:
           and any("not placed by the installer" in line for line in report),
           str(report))
 
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    placeholder = install.Installation(
+        "project", root, root / install.BASELINE, bundled, ("codex",)
+    )
+    output: list[str] = []
+    cancelled = install._remove_interactively(
+        install.empty_registry(), [placeholder], lambda _prompt: "", output.append
+    )
+    check("interactive removal can be cancelled without changing anything",
+          not cancelled and output[-1] == "Nothing removed.", str(output))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    placeholder = install.Installation(
+        "project", root, root / install.BASELINE, bundled, ("codex",)
+    )
+    answers = iter(["invalid", "0", "2"])
+    output = []
+    removed = install._remove_interactively(
+        install.empty_registry(), [placeholder],
+        lambda _prompt: next(answers), output.append,
+    )
+    check("interactive removal gives up after three invalid selections",
+          not removed
+          and sum("Invalid selection" in line for line in output) == 3
+          and output[-1] == "Nothing removed.", str(output))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    placeholder = install.Installation(
+        "project", root, root / install.BASELINE, bundled, ("codex",)
+    )
+    answers = iter(["all", "n"])
+    output = []
+    removed = install._remove_interactively(
+        install.empty_registry(), [placeholder],
+        lambda _prompt: next(answers), output.append,
+    )
+    check("interactive removal requires confirmation",
+          not removed
+          and any("This removes" in line for line in output)
+          and output[-1] == "Nothing removed.", str(output))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    install.install(["codex"], home, home)
+    item = [entry for entry in install.scan_user(home, {})
+            if entry.kind == "user"][0]
+    registry = install.empty_registry()
+    install.record_installation(registry, item, trusted=True)
+    answers = iter(["1", "y"])
+    output = []
+    removed = install._remove_interactively(
+        registry, [item], lambda _prompt: next(answers), output.append
+    )
+    check("interactive removal deletes the selected managed installation",
+          removed
+          and registry["user"] is None
+          and not install.user_source(home).exists()
+          and any(line.startswith("  removed") for line in output), str(output))
+
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp)
+    output: list[str] = []
+    cancelled = install._install_project_interactively(
+        home, install.empty_registry(), bundled, set(),
+        lambda _prompt: "", output.append,
+    )
+    missing = install._install_project_interactively(
+        home, install.empty_registry(), bundled, set(),
+        lambda _prompt: str(home / "missing"), output.append,
+    )
+    check("guided project setup rejects an empty or missing directory",
+          cancelled == (False, False)
+          and missing == (False, False)
+          and output == ["Project directory must be an existing non-root directory."],
+          str(output))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    symlinked = root / "symlink.json"
+    symlinked.symlink_to(root / "elsewhere.json")
+    directory = root / "directory.json"
+    directory.mkdir()
+    non_object = root / "list.json"
+    non_object.write_text("[]\n", encoding="utf-8")
+    rejects_symlink = rejected(lambda: install._read_hook_config(symlinked))
+    rejects_directory = rejected(lambda: install._read_hook_config(directory))
+    rejects_non_object = rejected(lambda: install._read_hook_config(non_object))
+    check("hook configuration rejects symlinks, directories, and non-objects",
+          rejects_symlink and rejects_directory and rejects_non_object)
+
 # --- import rewriting ------------------------------------------------------
 
 with tempfile.TemporaryDirectory() as tmp:
