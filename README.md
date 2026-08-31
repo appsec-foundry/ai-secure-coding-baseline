@@ -10,9 +10,9 @@
 
 AISCB gives AI coding assistants a compact set of secure-coding rules to follow when they write or change code. Add it to a project's instructions once instead of repeating the same security expectations in every prompt.
 
-> **What it does**
+> **Scope and limits**
 >
-> AISCB guides an assistant; it does not enforce policy or guarantee secure code. Keep project-specific instructions, reviews, tests, scanning, CI checks, and runtime controls in place.
+> AISCB is loaded as instructions for a coding agent. Its concrete security rules become part of the agent's working context, influencing how it plans, writes, changes, tests, and reviews code throughout a task. AISCB does not enforce policy or guarantee secure output: its effect depends on whether the agent loads the file and where the rules sit in the agent's instruction hierarchy. Keep project-specific instructions, reviews, tests, scanning, CI checks, and runtime controls in place.
 
 ## Quick start
 
