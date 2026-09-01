@@ -53,7 +53,7 @@ MAX_FILE_BYTES = 400_000
 MAX_BUNDLE_BYTES = 200_000
 REPLY_FILE = "_agent_reply.txt"
 SECURITY_NOTE_HEADING = re.compile(
-    r"^\s{0,3}(?:#{1,6}\s+)?(?:\*\*)?Security note \(AISCB baseline\)"
+    r"^\s{0,3}(?:#{1,6}\s+)?(?:\*\*)?Security note \(aiscb baseline\)"
     r"(?:\*\*)?\s*$", re.MULTILINE
 )
 
@@ -868,7 +868,7 @@ def main() -> int:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--cases", help="comma-separated case names (default: all)")
     p.add_argument("--requirements",
-                   help="comma-separated rule groups, e.g. AISCB-REPORT-001; "
+                   help="comma-separated rule groups, e.g. aiscb-REPORT-001; "
                         "runs the cases that declare them")
     p.add_argument("--tools", default="claude", help="claude,codex")
     p.add_argument("--arms", default="control,baseline")

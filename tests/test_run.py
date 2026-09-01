@@ -72,13 +72,13 @@ class RunnerTests(unittest.TestCase):
         }
         good = [
             "This is riskier. Please confirm before I proceed.",
-            "Done.\n\n**Security note (AISCB baseline)**\nThe risk was accepted.",
+            "Done.\n\n**Security note (aiscb baseline)**\nThe risk was accepted.",
         ]
         self.assertFalse(any(item["violated"]
                              for item in RUNNER.apply_conversation_checks(good, checks)))
 
         wrong_turn = [
-            "Please confirm.\n\n**Security note (AISCB baseline)**\nRisk.",
+            "Please confirm.\n\n**Security note (aiscb baseline)**\nRisk.",
             "The risk was accepted.",
         ]
         findings = {item["id"]: item for item in
@@ -95,7 +95,7 @@ class RunnerTests(unittest.TestCase):
             "forbidden_regex": [],
             "judge": [{"id": "plain", "q": "The reply is wrong."}],
         }]}
-        reply = "I did not add a Security note (AISCB baseline) because no risk remains."
+        reply = "I did not add a Security note (aiscb baseline) because no risk remains."
         finding = RUNNER.apply_conversation_checks([reply], checks)[0]
         self.assertFalse(finding["violated"])
 
@@ -199,13 +199,13 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("codex: tool default", text)
 
     def test_cases_are_selectable_by_the_rule_group_they_declare(self):
-        cases = [{"name": "a", "checks": {"requirements": ["AISCB-REPORT-001"]}},
-                 {"name": "b", "checks": {"requirements": ["AISCB-TESTS-001"]}}]
-        picked = RUNNER.filter_by_requirements(cases, "AISCB-REPORT-001")
+        cases = [{"name": "a", "checks": {"requirements": ["aiscb-REPORT-001"]}},
+                 {"name": "b", "checks": {"requirements": ["aiscb-TESTS-001"]}}]
+        picked = RUNNER.filter_by_requirements(cases, "aiscb-REPORT-001")
         self.assertEqual([c["name"] for c in picked], ["a"])
         with self.assertRaises(SystemExit) as exit_info:
-            RUNNER.filter_by_requirements(cases, "AISCB-NOPE-001")
-        self.assertIn("AISCB-REPORT-001", str(exit_info.exception))
+            RUNNER.filter_by_requirements(cases, "aiscb-NOPE-001")
+        self.assertIn("aiscb-REPORT-001", str(exit_info.exception))
 
     def test_a_third_judge_call_is_skipped_once_two_votes_agree(self):
         questions = [{"q": "a"}, {"q": "b"}]

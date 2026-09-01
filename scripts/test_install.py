@@ -1105,13 +1105,13 @@ with tempfile.TemporaryDirectory() as tmp:
         "  esac\n"
         "done\n"
         "case \"$url\" in\n"
-        "  */\"$AISCB_TEST_REF\"/*)\n"
-        "    path=${url#*\"$AISCB_TEST_REF\"/}\n"
-        "    cp \"$AISCB_TEST_REPO/$path\" \"$output\"\n"
-        "    if [ \"${AISCB_TEST_TAMPER:-}\" = \"$path\" ]; then\n"
+        "  */\"$aiscb_test_ref\"/*)\n"
+        "    path=${url#*\"$aiscb_test_ref\"/}\n"
+        "    cp \"$aiscb_test_repo/$path\" \"$output\"\n"
+        "    if [ \"${aiscb_test_tamper:-}\" = \"$path\" ]; then\n"
         "      printf '\\nchanged\\n' >> \"$output\"\n"
         "    fi\n"
-        "    if [ \"${AISCB_TEST_OVERSIZE:-}\" = \"$path\" ]; then\n"
+        "    if [ \"${aiscb_test_oversize:-}\" = \"$path\" ]; then\n"
         "      dd if=/dev/zero bs=1024 count=513 >> \"$output\" 2>/dev/null\n"
         "    fi ;;\n"
         "  *)\n"
@@ -1122,8 +1122,8 @@ with tempfile.TemporaryDirectory() as tmp:
     mock_curl.chmod(0o755)
     environment = os.environ.copy()
     environment["PATH"] = f"{mock_bin}{os.pathsep}{environment['PATH']}"
-    environment["AISCB_TEST_REF"] = "aiscb-bundle-0.1.10-1"
-    environment["AISCB_TEST_REPO"] = str(install.REPO)
+    environment["aiscb_test_ref"] = "aiscb-bundle-0.1.10-1"
+    environment["aiscb_test_repo"] = str(install.REPO)
     remote = subprocess.run(
         ["sh", str(remote_setup), "--help"],
         capture_output=True,
@@ -1135,7 +1135,7 @@ with tempfile.TemporaryDirectory() as tmp:
           remote.returncode == 0 and "usage: install.py" in remote.stdout,
           remote.stderr or remote.stdout)
     tampered_environment = environment.copy()
-    tampered_environment["AISCB_TEST_TAMPER"] = "scripts/install.py"
+    tampered_environment["aiscb_test_tamper"] = "scripts/install.py"
     tampered = subprocess.run(
         ["sh", str(remote_setup), "--help"],
         capture_output=True,
@@ -1148,7 +1148,7 @@ with tempfile.TemporaryDirectory() as tmp:
           and "Integrity check failed for scripts/install.py" in tampered.stderr,
           tampered.stderr or tampered.stdout)
     oversized_environment = environment.copy()
-    oversized_environment["AISCB_TEST_OVERSIZE"] = "scripts/install.py"
+    oversized_environment["aiscb_test_oversize"] = "scripts/install.py"
     oversized = subprocess.run(
         ["sh", str(remote_setup), "--help"],
         capture_output=True,

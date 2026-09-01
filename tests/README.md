@@ -1,6 +1,6 @@
 # Testing the baseline
 
-The suite measures whether AISCB changes assistant behavior. It runs the same
+The suite measures whether aiscb changes assistant behavior. It runs the same
 task with and without the project baseline, then compares the violations found
 in both arms.
 
@@ -20,7 +20,7 @@ make check                                    # validate everything; no model ca
 make dry-run                                  # show the matrix; spend nothing
 make test-smoke                               # verify that the harness works
 make test-quick                               # cheapest useful comparison
-make test-rule RULE=AISCB-REPORT-001          # cases for one rule group
+make test-rule RULE=aiscb-REPORT-001          # cases for one rule group
 make test                                     # all cases with the default tool
 make test-all                                 # all cases with Claude and Codex
 ```
@@ -31,7 +31,7 @@ the suite, so run `make dry-run` first. Pass runner options through `ARGS`, for
 example:
 
 ```bash
-make test-rule RULE=AISCB-LIMITS-001 ARGS="--repeats 5"
+make test-rule RULE=aiscb-LIMITS-001 ARGS="--repeats 5"
 make test-quick ARGS="--no-judge"
 ```
 
@@ -75,7 +75,7 @@ runs every case; `test-all` repeats that across Claude and Codex.
    `control` must report no baseline, while `baseline` must report the current
    one. Any mismatch stops the matrix before paid work begins.
 2. The runner copies the fixture into an isolated temporary directory.
-3. The baseline arm receives AISCB through the tool's project instruction
+3. The baseline arm receives aiscb through the tool's project instruction
    mechanism: `.claude/rules/secure-coding-baseline.md` for Claude Code or
    `AGENTS.md` for Codex. This installed file is excluded from scoring and the
    fixture diff.
@@ -87,11 +87,11 @@ runs every case; `test-all` repeats that across Claude and Codex.
 
 ### Why preflight matters
 
-Both arms use the same account and machine. A user-level AISCB install would
+Both arms use the same account and machine. A user-level aiscb install would
 put the baseline into `control`; a broken project install would remove it from
 `baseline`. Either failure makes the arms look artificially similar.
 
-Therefore AISCB must not be installed at user level for the tool under test.
+Therefore aiscb must not be installed at user level for the tool under test.
 Remove its import from `~/.claude/CLAUDE.md` or its content from
 `~/.codex/AGENTS.md` before measuring. Other user-level instructions still
 reach both arms and may influence the result. The preflight reports the exact
@@ -148,7 +148,7 @@ Every `checks.json` needs:
 
 - `mode`: `greenfield` or `existing`;
 - a non-empty `why` explaining the case;
-- `requirements`: the AISCB rule groups exercised by the case; and
+- `requirements`: the aiscb rule groups exercised by the case; and
 - at least one observable check.
 
 The prompt files define the real conversation. Fields such as `turns`,
@@ -246,7 +246,7 @@ accepts a material risk.
 - A session quota stops the whole matrix; otherwise later empty responses could
   be mistaken for clean passes.
 - User-level Claude and Codex instructions affect both arms, and Claude's also
-  affect the judge. Preflight only detects whether AISCB itself leaked between
+  affect the judge. Preflight only detects whether aiscb itself leaked between
   arms.
 - Pattern checks can produce false positives, especially on explanatory prose.
   Prefer code and data patterns and leave semantic wording to the judge.

@@ -1,7 +1,7 @@
-# Adapting AISCB inside an organization
+# Adapting aiscb inside an organization
 
 This guide shows how to add organization-specific rules and approved values
-without changing AISCB, then distribute them consistently.
+without changing aiscb, then distribute them consistently.
 
 The examples use Acme, Acme SSO, and internal blueprints. Replace these names
 with your own. This guide is a recommendation, not part of the baseline.
@@ -12,7 +12,7 @@ Keep five parts separate:
 
 | Part | Purpose |
 | --- | --- |
-| AISCB baseline | Unchanged upstream rules, pinned to an approved release |
+| aiscb baseline | Unchanged upstream rules, pinned to an approved release |
 | Organization overlay | Small set of rules that always apply |
 | Requirement packs | Detailed instructions and acceptance criteria, loaded only for matching work |
 | Blueprints | Approved values such as libraries, claim names, limits, headers, and mappings |
@@ -25,10 +25,10 @@ Use each part for one kind of content:
   domain such as authentication, tenant isolation, browser security, or APIs.
 - Put approved values in a blueprint when the rule can be understood without
   them. Examples include a tenant claim name or approved group mappings.
-- Use an AISCB mapping only when an organization rule genuinely makes an AISCB
+- Use an aiscb mapping only when an organization rule genuinely makes an aiscb
   rule more specific. Give organization-only requirements their own stable IDs.
 
-The overlay may narrow AISCB but never relax it. Enforce properties that must
+The overlay may narrow aiscb but never relax it. Enforce properties that must
 hold with application controls, tests, CI, or deployment policy as well.
 
 ## Before you start
@@ -38,12 +38,12 @@ support. Review bundles in a protected repository, publish immutable releases,
 and verify them by signature or pinned digests. Define rollout, rollback, and
 inventory for each supported tool and operating system.
 
-Use managed package or device management where possible. The current AISCB
+Use managed package or device management where possible. The current aiscb
 installer and version helper require Python 3.10 or newer. The examples below
 use Unix paths; on Windows, use the platform's managed and transactional
 installation mechanism instead of translating shell commands literally.
 
-Bundle the unchanged AISCB file, overlay, requirement catalog and packs,
+Bundle the unchanged aiscb file, overlay, requirement catalog and packs,
 blueprints, generated adapters, and a versioned manifest. Install releases side
 by side and switch atomically, for example:
 
@@ -60,12 +60,12 @@ session cannot mix releases.
 
 ## 1. Create a small organization overlay
 
-Give the overlay its own ID, such as `acme-sec-1.0.0`, while AISCB keeps its
-original ID and content. Do not copy AISCB rules into the overlay.
+Give the overlay its own ID, such as `acme-sec-1.0.0`, while aiscb keeps its
+original ID and content. Do not copy aiscb rules into the overlay.
 
 The overlay must:
 
-- state which rules narrow AISCB and which stand alone;
+- state which rules narrow aiscb and which stand alone;
 - contain every security-critical organization invariant;
 - require matching requirement packs and blueprints to be loaded before work;
 - stop affected work if required content is missing, invalid, incompatible,
@@ -79,16 +79,16 @@ A compact overlay can look like this:
 
 # Acme Secure Coding Overlay
 
-`baseline-id: acme-sec-1.0.0`. Extends AISCB (`aiscb-0.1.10`). On `baseline?`,
+`baseline-id: acme-sec-1.0.0`. Extends aiscb (`aiscb-0.1.10`). On `baseline?`,
 report both IDs and their source files.
 
-These rules may narrow AISCB but never relax it. If a conflict exists, or an
+These rules may narrow aiscb but never relax it. If a conflict exists, or an
 applicable pack or blueprint is unavailable or invalid, stop the affected work
 and report the problem. Do not invent a substitute.
 
 - **[ACME-REQ-ROUTING-001]** Load every requirement pack matching the task and
   its blueprints before affected work. Do not load unrelated packs.
-- **[ACME-TENANT-001]** (narrows AISCB-ACCESS-001): Bind every protected query
+- **[ACME-TENANT-001]** (narrows aiscb-ACCESS-001): Bind every protected query
   to the authenticated identity and tenant. Never take effective tenant or
   permissions from request data.
 ```
@@ -104,15 +104,15 @@ Maintain a catalog that records each pack's ID, file, owner, source, concise
 trigger description, optional path triggers, and requirement mappings. Use two
 mapping types:
 
-- `narrows`: the organization requirement makes named AISCB rules more specific;
-- `organization`: the requirement stands alone and has no invented AISCB target.
+- `narrows`: the organization requirement makes named aiscb rules more specific;
+- `organization`: the requirement stands alone and has no invented aiscb target.
 
 Several packs may match. Reject missing sources or packs, duplicate IDs,
-unknown mapping types, invalid AISCB targets, contradictory routes, and
+unknown mapping types, invalid aiscb targets, contradictory routes, and
 uncataloged packs.
 
 Each pack should contain stable requirement IDs, actionable rules, referenced
-blueprints, and representative positive and negative tests. Do not repeat AISCB
+blueprints, and representative positive and negative tests. Do not repeat aiscb
 text. For example:
 
 ```markdown
@@ -151,9 +151,9 @@ allow a faster path only for compatible, non-security-sensitive values.
 ## 4. Generate adapters for each tool
 
 Generate adapters from reviewed bundle sources; do not edit them by hand. In a
-combined file, place AISCB before the overlay and remove its import marker.
+combined file, place aiscb before the overlay and remove its import marker.
 
-Initially load only AISCB, the overlay, and discovery metadata. Load packs on
+Initially load only aiscb, the overlay, and discovery metadata. Load packs on
 matching semantic or path triggers. Prefer native skills for semantic triggers
 and path-scoped instructions for directory or file-pattern matches.
 
@@ -175,7 +175,7 @@ Tool-specific points:
 - **Claude Code:** use managed-policy `CLAUDE.md` or another root-managed,
   immutable path for organization-wide enforcement. Imports load eagerly;
   skills load on demand.
-- **Codex:** generate an `AGENTS.md` containing AISCB followed by the overlay;
+- **Codex:** generate an `AGENTS.md` containing aiscb followed by the overlay;
   Codex has no documented import directive for this file. Keep it within the
   configured instruction limit and install packs as skills. Codex discovers its
   `AGENTS.md` chain once per run.
@@ -196,7 +196,7 @@ the generated adapter against its digest.
 
 Publish each approved bundle under an immutable version. Its manifest records:
 
-- bundle, overlay, and AISCB IDs, plus the exact upstream digest;
+- bundle, overlay, and aiscb IDs, plus the exact upstream digest;
 - catalog, pack, blueprint, schema, and compatibility versions and digests;
 - every installed path, file size, and SHA-256 digest;
 - adapter-generator version and measured instruction budgets; and
@@ -238,7 +238,7 @@ If the fork keeps the upstream release check, preserve its URL, redirect, and
 destination validation. Ship reviewed helper sources rather than editing
 installed copies.
 
-Automate checks for catalog consistency, valid AISCB mappings, unique IDs,
+Automate checks for catalog consistency, valid aiscb mappings, unique IDs,
 complete routes, blueprint schemas and compatibility, safe paths, replaced
 placeholders, adapter order and budgets, manifest digests, and atomic install.
 Test install, update, rollback, interruption, drift, and missing or incompatible

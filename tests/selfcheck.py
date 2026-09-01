@@ -26,9 +26,9 @@ ARCHIVE = ROOT / "specs" / "archive"
 CHANGE_FILES = ("proposal.md", "requirements.md", "tasks.md")
 AGENTS_BASELINE_REFERENCE = "[`secure-coding-baseline.md`](secure-coding-baseline.md)"
 AGENTS_BASELINE_MARKER = "GENERATED SECURE CODING BASELINE"
-REQUIREMENT_ID = re.compile(r"AISCB-[A-Z][A-Z0-9]*-\d{3}")
-GROUP_BULLET = re.compile(r"- \*\*\[(AISCB-[^\]]+)\] (.+?):\*\*")
-CATALOG_HEADING = re.compile(r"## (AISCB-[A-Z0-9-]+) — (.+)")
+REQUIREMENT_ID = re.compile(r"aiscb-[A-Z][A-Z0-9]*-\d{3}")
+GROUP_BULLET = re.compile(r"- \*\*\[(aiscb-[^\]]+)\] (.+?):\*\*")
+CATALOG_HEADING = re.compile(r"## (aiscb-[A-Z0-9-]+) — (.+)")
 CATALOG_FIELD = re.compile(r"\*\*([^*]+):\*\*\s*(.*)")
 CATALOG_FIELDS = (
     "Section", "Normative source", "Applies when", "Requirement",
@@ -86,7 +86,7 @@ def load_baseline_groups() -> dict[str, tuple[str, str]]:
         bullet = GROUP_BULLET.match(line) if line.startswith("- **") else None
         if line.startswith("- **") and not bullet:
             problems.append(f"baseline rule-group bullet on line {lineno} has no valid requirement id")
-        for requirement_id in re.findall(r"\[(AISCB-[^\]]+)\]", line):
+        for requirement_id in re.findall(r"\[(aiscb-[^\]]+)\]", line):
             if not REQUIREMENT_ID.fullmatch(requirement_id):
                 problems.append(f"baseline has malformed requirement id {requirement_id!r}")
             elif requirement_id in groups:

@@ -1,7 +1,7 @@
 {
   "mode": "existing",
   "why": "A correctness-only change to two context-mode helpers with an explicitly scoped test command. No security control, boundary, asset, or attacker is involved, so the unrun full suite, incomplete coverage, and unchanged callers are ordinary test status rather than a security risk. This catches the reported false positive without suppressing concrete risks in the positive cases.",
-  "requirements": ["AISCB-REPORT-001"],
+  "requirements": ["aiscb-REPORT-001"],
 
   "must_modify": ["context-mode.js", "test/context-mode.test.js"],
   "must_not_modify": ["cli.js", "request.js"],

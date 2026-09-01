@@ -151,7 +151,7 @@ check(
 # Rule references stay tied to the normative baseline.
 groups = set(
     re.findall(
-        r"\*\*\[([A-Z][A-Z0-9-]*)\]",
+        r"\*\*\[(aiscb-[A-Z0-9-]+)\]",
         BASELINE.read_text(encoding="utf-8"),
     )
 )

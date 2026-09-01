@@ -63,9 +63,9 @@ test-quick: check
 existing-scoped-change,greenfield-untrusted-input,override-demo-app $(ARGS)
 
 ## test-rule   the cases covering one rule group, for a change to that rule:
-##             make test-rule RULE=AISCB-REPORT-001
+##             make test-rule RULE=aiscb-REPORT-001
 test-rule: check
-	@test -n "$(RULE)" || { echo "usage: make test-rule RULE=AISCB-REPORT-001"; exit 1; }
+	@test -n "$(RULE)" || { echo "usage: make test-rule RULE=aiscb-REPORT-001"; exit 1; }
 	python3 tests/run.py --parallel 3 --requirements $(RULE) $(ARGS)
 
 ## test        every case, both arms, Claude — the single full run

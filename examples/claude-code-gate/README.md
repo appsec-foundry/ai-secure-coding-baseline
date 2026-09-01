@@ -13,8 +13,8 @@ surrounding application.
 
 | Baseline rule | Blocked edit |
 | --- | --- |
-| `AISCB-PRESERVE-001` | Disabling TLS certificate verification, for example `verify=False` or `curl -k` |
-| `AISCB-PRESERVE-001` | Adding a switch that disables authentication, authorization, or CSRF protection |
+| `aiscb-PRESERVE-001` | Disabling TLS certificate verification, for example `verify=False` or `curl -k` |
+| `aiscb-PRESERVE-001` | Adding a switch that disables authentication, authorization, or CSRF protection |
 
 Only text added through Claude Code's `Write`, `Edit`, and `NotebookEdit` tools
 is checked. The example directory itself is excluded so its patterns and tests
