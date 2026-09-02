@@ -22,8 +22,8 @@ The guided installer is the recommended way to install or update aiscb. Copy and
 curl --proto '=https' \
   --fail --silent --show-error \
   --output aiscb-setup.sh \
-  https://raw.githubusercontent.com/appsec-foundry/aiscb/03f204ad8efb01ef98a5e73e06bc7057134fd83f/setup.sh &&
-echo 'd52ad36042d00e6957a8b5987db5763d237629108087f8ee35aa0aa244dd52cf  aiscb-setup.sh' |
+  https://raw.githubusercontent.com/appsec-foundry/aiscb/29bdc5a3f7fc5a3e8189100a124ca510bd9a62ab/setup.sh &&
+echo 'd4b2abf71d83ce3175017c44970497b54c20f83f823beb2c3728825bc8e770f3  aiscb-setup.sh' |
   sha256sum --check &&
 bash aiscb-setup.sh
 ```
