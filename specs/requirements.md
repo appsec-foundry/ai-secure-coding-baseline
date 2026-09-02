@@ -16,7 +16,7 @@ names, sections, required fields, and case references in sync.
 interface.
 
 **Requirement:** Follow existing patterns and controls. Make the smallest
-compliant change. Report concrete security issues encountered in scope that meet
+compliant change. Report concrete pre-existing security issues that meet
 the reporting threshold of `aiscb-REPORT-001`, without silently fixing them or
 turning the task into an audit.
 
@@ -39,8 +39,10 @@ deployment-wide check.
 
 **Requirement:** Design applicable controls, secure configuration, and tests
 into the work. Keep throwaway prototypes local, clearly marked, and free of real
-data. Seed demo accounts only under the baseline's explicit prototype rules and
-name their production risk in the baseline-attributed residual-risk note.
+data. Seed accounts only when the user explicitly asks and always with
+CSPRNG-generated credentials; outside a marked prototype the work stays
+production-deployable and the seeded accounts are named in the
+baseline-attributed residual-risk note as what keeps it out of production.
 
 **Observable acceptance:** A deployable result includes its required controls
 and verification path. A prototype cannot be mistaken for production software.
@@ -220,7 +222,8 @@ identity data.
 
 **Requirement:** Never commit, expose, or log real secrets. Keep secret values
 out of model and tool context when redacted local checks suffice. Do not ship
-working accounts except under the prototype rule. Bootstrap securely, require
+working accounts except through the explicitly requested, CSPRNG-generated
+seeding the Operating Mode permits. Bootstrap securely, require
 persistent keys from external configuration, and fail when required secrets are
 missing.
 
@@ -526,7 +529,10 @@ residual-risk note appears only when the delivered state
 creates or materially worsens such a risk, including through a weakened material
 control, a newly relevant pre-existing weakness, an accepted trade-off, or a
 changed critical security boundary whose concrete dangerous failure mode remains
-materially unverified. Ordinary verification status does not trigger it. Order
+materially unverified. Ordinary verification status does not trigger it. Every
+other qualifying issue is reported once in the main answer; a refusal or an
+expressly requested risk review needs no note of its own, while a risk the
+delivered part still creates keeps one. Order
 risks by impact and urgency, group common causes, state each once, and scale
 detail to what the decision or corrective action needs.
 
