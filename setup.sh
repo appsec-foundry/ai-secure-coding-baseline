@@ -28,8 +28,8 @@ command -v sha256sum >/dev/null 2>&1 || {
 
 # This tag is never moved or reused. The hashes keep a moved or corrupted tag
 # from changing what this reviewed bootstrap executes.
-bundle_ref="aiscb-bundle-0.1.11-1"
-baseline_sha="4aa312abbd75da21034a4ae2be5c560c7a485b39c6c0381ce459367a940c90fa"
+bundle_ref="aiscb-bundle-0.1.11-2"
+baseline_sha="505110cef14fe76d883807ac4b545b054ed50f0218f0fe587574fbfd31c546a1"
 installer_sha="90eb898235389ee34e92dc62b2755b8d0c940521729a41a78e8d4b8c01901239"
 helper_sha="768746c35676ebf701e7c43fce26ff000dd1f4754e7e060f6f280510e1cd0033"
 
