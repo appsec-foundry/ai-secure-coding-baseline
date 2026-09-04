@@ -238,7 +238,7 @@ These resources are background, not claims of certification, conformance, or com
 
 ## Development
 
-`secure-coding-baseline.md` is the normative product. At 20.4 KB, or 4,065 tokens, it stays within its approximate 4,100-token budget. It has been shaped through practical AI-assisted coding tasks but has not undergone formal certification.
+`secure-coding-baseline.md` is the normative product. At 20.2 KB, or 4,029 tokens, it stays within its approximate 4,100-token budget. It has been shaped through practical AI-assisted coding tasks but has not undergone formal certification.
 
 [`specs/requirements.md`](specs/requirements.md) explains the rule groups and their test coverage. Behavior changes need a proposal, sourced requirements, and a task list under [`specs/changes/`](specs/changes/); editorial and repository-only changes do not. See [`specs/README.md`](specs/README.md) for the workflow.
 
