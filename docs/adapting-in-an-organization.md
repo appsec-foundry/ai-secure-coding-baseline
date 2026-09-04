@@ -48,7 +48,7 @@ are placeholders that the build replaces with verified absolute paths.
 
 # Acme Secure Coding Overlay
 
-`baseline-id: acme-sec-1.0.0`. Extends aiscb (`aiscb-0.1.11`). On `baseline?`,
+`baseline-id: acme-sec-1.0.0`. Extends aiscb (`aiscb-0.1.12`). On `baseline?`,
 report both IDs and their source files.
 
 These rules may narrow aiscb but never relax it. If a conflict exists, or an

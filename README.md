@@ -22,8 +22,8 @@ The guided installer is the recommended way to install or update aiscb. Copy and
 curl --proto '=https' \
   --fail --silent --show-error \
   --output aiscb-setup.sh \
-  https://raw.githubusercontent.com/appsec-foundry/aiscb/1021757c75f3b42b89fb91ea8748f16aeaa42ae3/setup.sh &&
-echo 'b80d9c5271484118997deef56c84f729b4c296f68e27471c0e1e77f9b51474f9  aiscb-setup.sh' |
+  https://raw.githubusercontent.com/appsec-foundry/aiscb/642c4f61cde8a7ef25453174aeb707d6323faef0/setup.sh &&
+echo 'ea3da17dfc235232ab01da84ceeb8d63d4251a9cf1d88abb5e1eaf7f35345aa6  aiscb-setup.sh' |
   sha256sum --check &&
 bash aiscb-setup.sh
 ```
@@ -206,9 +206,9 @@ This is a reference, not an automatic import.
 
 ### Verify it loaded
 
-Ask the tool `baseline?`. The answer should include `aiscb-0.1.11` and the file it came from. This confirms that the assistant can see the baseline, not that it was loaded before the question or will always be followed.
+Ask the tool `baseline?`. The answer should include `aiscb-0.1.12` and the file it came from. This confirms that the assistant can see the baseline, not that it was loaded before the question or will always be followed.
 
-- `aiscb-0.1.11`: this baseline.
+- `aiscb-0.1.12`: this baseline.
 
 The assistant reports every loaded ID. Claude Code users can also inspect loaded files with `/context` or `/memory`.
 
@@ -218,7 +218,7 @@ The license allows organizations to derive their own baseline with internal secu
 
 Add stack-specific details such as approved libraries or framework patterns. Keep existing rule-group IDs so individual rules remain traceable, but give the derived baseline its own ID using [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html):
 
-- `aiscb-0.1.11+acme`: a version derived from aiscb.
+- `aiscb-0.1.12+acme`: a version derived from aiscb.
 - `acme-sec-1.0.0`: an independent baseline.
 
 To leave the baseline file unchanged and put your rules in a second one beside it, see [adapting aiscb inside an organization](docs/adapting-in-an-organization.md).
